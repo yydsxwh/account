@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 账号：邮箱 / 登录名 / 手机 / 微信 四种方式可指向同一用户
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  /// 是否已设置可用登录密码；手机/微信自动注册且未设密码时为 false
+  passwordSet  Boolean @default(true)
+  name         String
+  /// 账号密码登录用的登录名（小写存储）；空/null 表示未开通账号登录
+  username     String? @unique
+  bio          String  @default("")
+  avatarUrl    String  @default("")
+  /// 手机号登录用；空表示未绑定
+  phone        String  @default("")
+  /// ADMIN 站长 | AGENT 加盟代理 | MERCHANT 入驻商家 | TEACHER 老师 | STUDENT 用户
+  role         String  @default("STUDENT")
+  /// 多角色：逗号分隔；空则仅用 role
+  roles        String  @default("")
+  requestedRole         String @default("")
+  roleApplicationStatus String @default("NONE")
+  roleApplicationNote   String @default("")
+  roleReviewedAt        DateTime?
+  roleReviewedById      String?
+  adminNote             String @default("")
+  wechatOpenId       String @default("")
+  wechatWebOpenId    String @default("")
+  wechatMobileOpenId String @default("")
+  wechatUnionId      String @default("")
+  referralCode String  @unique
+  referredById String?
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id])
+  referrals    User[]  @relation("Referrals")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([roleApplicationStatus])
+  @@index([phone])
+  @@index([wechatOpenId])
+  @@index([wechatWebOpenId])
+  @@index([wechatMobileOpenId])
+  @@index([wechatUnionId])
+  @@index([name])
+}
+
+/// 短信验证码（手机号登录 / 绑定）；哈希存储，短时有效
+model SmsCode {
+  id        String    @id @default(cuid())
+  phone     String
+  codeHash  String
+  /// login | bind
+  purpose   String    @default("login")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, purpose])
+  @@index([expiresAt])
+}
+
+/// 站长系统设置（短信 / 微信授权），单例 id = default
+model SiteSettings {
+  id String @id @default("default")
+
+  siteUrl String @default("")
+
+  wechatAppId           String @default("")
+  wechatAppSecret       String @default("")
+  wechatWebAppId        String @default("")
+  wechatWebAppSecret    String @default("")
+  wechatMobileAppId     String @default("")
+  wechatMobileAppSecret String @default("")
+
+  smsEnabled         Boolean @default(true)
+  smsProvider        String  @default("test")
+  smsAccessKeyId     String  @default("")
+  smsAccessKeySecret String  @default("")
+  smsSignName        String  @default("")
+  smsTemplateCode    String  @default("")
+  smsTestMode        Boolean @default(true)
+  smsTestFixedCode   String  @default("123456")
+
+  updatedAt DateTime @updatedAt
+}

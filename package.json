@@ -1,0 +1,47 @@
+{
+  "name": "account",
+  "version": "0.1.0",
+  "private": true,
+  "description": "从 Andyyyds 抽出的账号系统：邮箱/账号/手机/微信登录注册、个人中心、站长用户管理",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@alicloud/pop-core": "^1.8.0",
+    "@andyyyds/shared": "*",
+    "@capacitor/core": "^8.5.0",
+    "@prisma/client": "^5.22.0",
+    "@tailwindcss/postcss": "^4",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.8",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwindcss": "^4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.23.8",
+    "typescript": "^5"
+  }
+}

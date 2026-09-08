@@ -1,0 +1,9 @@
+{
+  "name": "@andyyyds/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "账号系统公共代码：登录会话、密码、短信、微信授权、角色",
+  "exports": {
+    "./*": "./src/*"
+  }
+}
