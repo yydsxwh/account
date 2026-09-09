@@ -42,6 +42,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Next.js auto-generated agent rule files
+/AGENTS.md
+/CLAUDE.md
+
 # uploaded media
 /public/uploads
 /uploads

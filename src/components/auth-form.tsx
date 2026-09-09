@@ -214,12 +214,8 @@ export function AuthForm({
       router.refresh();
       return;
     }
-    // 登录与各渠道注册成功后统一进个人中心；账号/邮箱密码注册去课程广场选课
-    if (mode === "register" && (channel === "email" || channel === "account")) {
-      router.push("/courses");
-    } else {
-      router.push("/account");
-    }
+    // 本仓库只有账号中心，登录/注册成功后统一进个人中心
+    router.push("/account");
     router.refresh();
   }
 
