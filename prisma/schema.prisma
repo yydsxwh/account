@@ -90,3 +90,48 @@ model SiteSettings {
 
   updatedAt DateTime @updatedAt
 }
+
+/// 接入账号中心的软件产品（第一方应用）
+model OAuthClient {
+  id           String   @id @default(cuid())
+  /// 给产品配置的公开 ID，如 docs / shop
+  clientId     String   @unique
+  /// bcrypt 后的密钥；明文只在创建时展示一次
+  clientSecret String
+  name         String
+  /// 产品首页，个人中心「打开」用
+  homepageUrl  String   @default("")
+  /// JSON 字符串数组：登录成功后允许跳回的地址
+  redirectUris String   @default("[]")
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// 一次性授权码：产品用它向账号中心换用户
+model OAuthCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  clientId    String
+  userId      String
+  redirectUri String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([expiresAt])
+}
+
+/// 产品服务端持有的访问令牌
+model OAuthAccessToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  clientId  String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}

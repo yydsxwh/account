@@ -1,9 +1,13 @@
 import { hashPassword, makeReferralCode } from "../packages/shared/src/password";
+import { hashClientSecret, serializeUriList } from "../packages/shared/src/oauth";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.oAuthAccessToken.deleteMany();
+  await prisma.oAuthCode.deleteMany();
+  await prisma.oAuthClient.deleteMany();
   await prisma.smsCode.deleteMany();
   await prisma.user.deleteMany();
   await prisma.siteSettings.deleteMany();
@@ -104,10 +108,40 @@ async function main() {
     },
   });
 
+  const docsSecret = process.env.DEMO_DOCS_CLIENT_SECRET || "demo-docs-secret";
+  const shopSecret = process.env.DEMO_SHOP_CLIENT_SECRET || "demo-shop-secret";
+  await prisma.oAuthClient.create({
+    data: {
+      clientId: "docs",
+      clientSecret: await hashClientSecret(docsSecret),
+      name: "文档",
+      homepageUrl: "/demo/docs",
+      redirectUris: serializeUriList([
+        "/demo/docs/callback",
+        "http://localhost:3000/demo/docs/callback",
+        "http://127.0.0.1:3000/demo/docs/callback",
+      ]),
+    },
+  });
+  await prisma.oAuthClient.create({
+    data: {
+      clientId: "shop",
+      clientSecret: await hashClientSecret(shopSecret),
+      name: "商城",
+      homepageUrl: "/demo/shop",
+      redirectUris: serializeUriList([
+        "/demo/shop/callback",
+        "http://localhost:3000/demo/shop/callback",
+        "http://127.0.0.1:3000/demo/shop/callback",
+      ]),
+    },
+  });
+
   console.log("Seeded demo accounts. Password for all: 123456");
   console.log("  admin@yyds.local / teacher@yyds.local / agent@yyds.local");
   console.log("  student@yyds.local / merchant@yyds.local");
   console.log("  username demo_user / 123456");
+  console.log("Demo products: docs / shop  (open /demo/docs and /demo/shop)");
 }
 
 main()

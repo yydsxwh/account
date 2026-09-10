@@ -10,6 +10,7 @@
 - 微信：公众号网页授权、开放平台扫码、Android SDK
 - 个人中心：昵称、头像、绑定邮箱 / 账号 / 手机 / 微信、改密码、角色申请
 - 站长后台：用户列表、角色审核、邀请关系、短信与微信配置
+- 多产品单点登录：一套账号进入文档、商城等已登记软件
 
 ## 本地运行
 
@@ -37,3 +38,33 @@ npm run dev
 | 账号登录 | 用户名 `demo_user` |
 
 手机号登录：系统设置里已开启短信测试模式，验证码固定为 `123456`。
+
+## 多产品共用一套账号
+
+账号中心相当于 Google 的 `accounts.google.com`。每个软件产品不要自己做注册，只要把用户送到这里登录。
+
+1. 站长打开「软件产品」，登记产品名称、首页、回调地址，保存下发的 `client_id` / `client_secret`。
+2. 产品里未登录时跳到：
+
+```
+https://账号中心/api/oauth/authorize?client_id=文档ID&redirect_uri=https://你的产品/auth/callback&state=随机串
+```
+
+3. 用户在账号中心登录（或已经登录则直接回来）。
+4. 产品服务端用回调里的 `code` 换用户：
+
+```http
+POST /api/oauth/token
+{
+  "client_id": "docs",
+  "client_secret": "只放在产品服务器",
+  "code": "回调参数",
+  "redirect_uri": "必须和登记的完全一致"
+}
+```
+
+返回的 `user.id` 就是全站统一账号。产品库只存这个 id 和本站业务数据，不要再存一份密码。
+
+本地演示：打开 `/demo/docs` 和 `/demo/shop`，用 `admin@yyds.local` / `123456` 登录。退出某个产品后，只要账号中心还在登录，再点「用账号中心登录」不用再输密码。
+
+同父域名（如 `account.yydsxwh.com` 与 `docs.yydsxwh.com`）还可在 `.env` 设 `COOKIE_DOMAIN=.yydsxwh.com`。

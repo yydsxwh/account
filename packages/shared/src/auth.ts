@@ -55,18 +55,29 @@ export async function createSession(
     .sign(getSecret());
 
   const jar = await cookies();
+  const domain = process.env.COOKIE_DOMAIN?.trim() || undefined;
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
+    // 同父域名多产品：设成 .yydsxwh.com，各子站共享登录态
+    ...(domain ? { domain } : {}),
   });
 }
 
 export async function destroySession() {
   const jar = await cookies();
-  jar.delete(COOKIE_NAME);
+  const domain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+  jar.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+    ...(domain ? { domain } : {}),
+  });
 }
 
 export async function getSession(): Promise<SessionUser | null> {

@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { getSession } from "@andyyyds/shared/auth";
+import { listPublicProducts } from "@andyyyds/shared/oauth";
 import { isAdmin } from "@andyyyds/shared/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const session = await getSession();
+  const [session, products] = await Promise.all([
+    getSession(),
+    listPublicProducts(),
+  ]);
 
   return (
     <div className="container space-y-8 py-16">
       <header className="space-y-3">
         <h1 className="text-4xl font-semibold">账号中心</h1>
         <p className="max-w-2xl text-[var(--muted)]">
-          从 Andyyyds 复制而来的登录注册能力：邮箱、登录账号、手机验证码、微信（公众号 / 扫码 / App），以及个人资料、密码绑定和站长用户审核。
+          一套账号密码，登录你名下的多个软件产品。邮箱、登录名、手机、微信都在这里注册；文档、商城等产品跳过来登录即可。
         </p>
       </header>
 
@@ -25,9 +29,14 @@ export default async function HomePage() {
               进入个人中心
             </Link>
             {isAdmin(session) ? (
-              <Link href="/studio/users" className="btn btn-secondary min-h-11 px-4">
-                用户管理
-              </Link>
+              <>
+                <Link href="/studio/users" className="btn btn-secondary min-h-11 px-4">
+                  用户管理
+                </Link>
+                <Link href="/studio/apps" className="btn btn-secondary min-h-11 px-4">
+                  软件产品
+                </Link>
+              </>
             ) : null}
           </div>
         </section>
@@ -41,6 +50,32 @@ export default async function HomePage() {
           </Link>
         </section>
       )}
+
+      {products.length > 0 ? (
+        <section className="surface space-y-3 rounded-[28px] p-6">
+          <h2 className="text-lg font-semibold">软件产品</h2>
+          <p className="text-sm text-[var(--muted)]">
+            用上面的同一套账号进入。先打开产品，再点「用账号中心登录」。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {products.map((product) =>
+              product.homepageUrl ? (
+                <Link
+                  key={product.clientId}
+                  href={product.homepageUrl}
+                  className="btn btn-secondary min-h-11 px-4"
+                >
+                  {product.name}
+                </Link>
+              ) : (
+                <span key={product.clientId} className="text-sm">
+                  {product.name}
+                </span>
+              ),
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="surface rounded-[24px] p-5">

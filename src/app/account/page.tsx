@@ -6,6 +6,7 @@ import { getSession } from "@andyyyds/shared/auth";
 import { isPlaceholderEmail } from "@andyyyds/shared/auth-email";
 import { prisma } from "@andyyyds/shared/db";
 import { inviteRegisterUrl } from "@andyyyds/shared/invite";
+import { listPublicProducts } from "@andyyyds/shared/oauth";
 import { availableAccountApplyRoles } from "@andyyyds/shared/role-applications";
 import {
   isAdmin,
@@ -23,23 +24,26 @@ export default async function AccountPage() {
   const session = await getSession();
   if (!session) redirect("/login?next=/account");
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: {
-      referralCode: true,
-      roleApplicationNote: true,
-      roleApplicationStatus: true,
-      requestedRole: true,
-      email: true,
-      phone: true,
-      username: true,
-      wechatOpenId: true,
-      wechatWebOpenId: true,
-      wechatMobileOpenId: true,
-      avatarUrl: true,
-      passwordSet: true,
-    },
-  });
+  const [user, products] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.id },
+      select: {
+        referralCode: true,
+        roleApplicationNote: true,
+        roleApplicationStatus: true,
+        requestedRole: true,
+        email: true,
+        phone: true,
+        username: true,
+        wechatOpenId: true,
+        wechatWebOpenId: true,
+        wechatMobileOpenId: true,
+        avatarUrl: true,
+        passwordSet: true,
+      },
+    }),
+    listPublicProducts(),
+  ]);
 
   const applyRoles = availableAccountApplyRoles(
     session,
@@ -95,6 +99,30 @@ export default async function AccountPage() {
               "站长未通过你的角色申请。可在下方重新提交申请。"}
           </p>
         </div>
+      ) : null}
+
+      {products.length > 0 ? (
+        <section className="surface rounded-[28px] p-5 sm:p-6">
+          <h2 className="text-lg font-semibold">我的软件</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            用当前账号打开已接入的产品，不必再注册。
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {products.map((product) =>
+              product.homepageUrl ? (
+                <a
+                  key={product.clientId}
+                  href={product.homepageUrl}
+                  className="btn btn-secondary min-h-11 px-4"
+                >
+                  {product.name}
+                </a>
+              ) : (
+                <span key={product.clientId}>{product.name}</span>
+              ),
+            )}
+          </div>
+        </section>
       ) : null}
 
       <AccountProfilePanel

@@ -30,9 +30,14 @@ export async function SiteHeader() {
                 </span>
               </Link>
               {isAdmin(session) ? (
-                <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
-                  用户管理
-                </Link>
+                <>
+                  <Link href="/studio/apps" className="btn btn-secondary min-h-10 px-3">
+                    软件产品
+                  </Link>
+                  <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
+                    用户管理
+                  </Link>
+                </>
               ) : null}
               <form action="/api/auth/logout" method="post">
                 <button type="submit" className="btn btn-secondary min-h-10 px-3">

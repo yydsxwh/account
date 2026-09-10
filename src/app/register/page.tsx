@@ -2,8 +2,20 @@ import { AuthForm } from "@/components/auth-form";
 import { preferWechatFromAcceptLanguage } from "@andyyyds/shared/auth-channel-preference";
 import { headers } from "next/headers";
 import Link from "next/link";
+import {
+  productLoginSearch,
+  readProductLoginQuery,
+} from "@/helpers/oauth-query";
 
-function loginHref(next: string | undefined) {
+function loginHref(input: {
+  next?: string;
+  client_id?: string;
+  redirect_uri?: string;
+  state?: string;
+}) {
+  const product = readProductLoginQuery(input);
+  if (product) return `/login?${productLoginSearch(product)}`;
+  const next = input.next;
   if (!next || !next.startsWith("/") || next.startsWith("//")) {
     return "/login";
   }
@@ -13,7 +25,13 @@ function loginHref(next: string | undefined) {
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string; next?: string }>;
+  searchParams: Promise<{
+    ref?: string;
+    next?: string;
+    client_id?: string;
+    redirect_uri?: string;
+    state?: string;
+  }>;
 }) {
   const params = await searchParams;
   const ref = params.ref?.trim() || "";
@@ -21,9 +39,15 @@ export default async function RegisterPage({
   const preferWechat = preferWechatFromAcceptLanguage(
     headerList.get("accept-language"),
   );
+  const product = readProductLoginQuery(params);
 
   return (
     <div className="container py-16">
+      {product ? (
+        <p className="mb-4 text-center text-sm text-[var(--muted)]">
+          注册后可直接进入该软件产品
+        </p>
+      ) : null}
       <AuthForm
         mode="register"
         defaultReferralCode={ref}
@@ -31,7 +55,7 @@ export default async function RegisterPage({
       />
       <p className="mt-4 text-center text-sm text-[var(--muted)]">
         已有账号？{" "}
-        <Link href={loginHref(params.next)} className="text-[var(--brand)]">
+        <Link href={loginHref(params)} className="text-[var(--brand)]">
           去登录
         </Link>
       </p>

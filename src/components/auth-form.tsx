@@ -199,6 +199,18 @@ export function AuthForm({
     message?: string;
     isNewUser?: boolean;
   }) {
+    const search = new URLSearchParams(window.location.search);
+    const clientId = (search.get("client_id") || "").trim();
+    const redirectUri = (search.get("redirect_uri") || "").trim();
+    const oauthState = (search.get("state") || "").trim();
+    if (clientId && redirectUri) {
+      const authorize = new URL("/api/oauth/authorize", window.location.origin);
+      authorize.searchParams.set("client_id", clientId);
+      authorize.searchParams.set("redirect_uri", redirectUri);
+      if (oauthState) authorize.searchParams.set("state", oauthState);
+      window.location.assign(authorize.toString());
+      return;
+    }
     if (data.pendingReview) {
       setNotice(data.message || PENDING_REVIEW_MESSAGE);
       router.push("/account?pending=1");
@@ -206,9 +218,7 @@ export function AuthForm({
       return;
     }
     // 约搭等流程会带 ?next=，登录后回到原页面继续报名/发起
-    const nextPath = safeNextPath(
-      new URLSearchParams(window.location.search).get("next"),
-    );
+    const nextPath = safeNextPath(search.get("next"));
     if (nextPath) {
       router.push(nextPath);
       router.refresh();
@@ -341,10 +351,20 @@ export function AuthForm({
   }
 
   function buildWechatLoginParams() {
-    const nextPath =
-      safeNextPath(
-        new URLSearchParams(window.location.search).get("next"),
-      ) || "/";
+    const search = new URLSearchParams(window.location.search);
+    const clientId = (search.get("client_id") || "").trim();
+    const redirectUri = (search.get("redirect_uri") || "").trim();
+    const oauthState = (search.get("state") || "").trim();
+    let nextPath =
+      safeNextPath(search.get("next")) || "/";
+    if (clientId && redirectUri) {
+      const authorize = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+      });
+      if (oauthState) authorize.set("state", oauthState);
+      nextPath = `/api/oauth/authorize?${authorize.toString()}`;
+    }
     const params = new URLSearchParams({
       purpose: "login",
       returnUrl: nextPath,
