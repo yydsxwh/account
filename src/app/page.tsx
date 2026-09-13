@@ -92,24 +92,34 @@ export default async function HomePage() {
           <ul className="mt-3 space-y-1 text-sm text-[var(--muted)]">
             <li>邮箱 + 密码</li>
             <li>登录账号 + 密码（4–20 位小写字母开头）</li>
-            <li>手机号收验证码登录 / 注册（测试码 123456；配阿里云后发到手机）</li>
+            <li>手机号收验证码登录 / 注册</li>
             <li>微信公众号 / 扫码 / Android SDK</li>
           </ul>
         </div>
-        <div className="surface rounded-[24px] p-5">
-          <h2 className="text-lg font-semibold">演示账号</h2>
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            种子数据密码均为 <code>123456</code>
-          </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            <li>站长 admin@yyds.local</li>
-            <li>老师 teacher@yyds.local</li>
-            <li>代理 agent@yyds.local</li>
-            <li>学员 student@yyds.local</li>
-            <li>待审商家 merchant@yyds.local</li>
-            <li>账号登录 demo_user / 123456</li>
-          </ul>
-        </div>
+        {process.env.NODE_ENV !== "production" ? (
+          <div className="surface rounded-[24px] p-5">
+            <h2 className="text-lg font-semibold">演示账号</h2>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              仅本地种子数据，密码均为 <code>123456</code>
+            </p>
+            <ul className="mt-2 space-y-1 text-sm">
+              <li>站长 admin@yyds.local</li>
+              <li>老师 teacher@yyds.local</li>
+              <li>代理 agent@yyds.local</li>
+              <li>学员 student@yyds.local</li>
+              <li>待审商家 merchant@yyds.local</li>
+              <li>账号登录 demo_user / 123456</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="surface rounded-[24px] p-5">
+            <h2 className="text-lg font-semibold">给其他产品用</h2>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              站长在「软件产品」里登记回调地址。产品按 /integrate 的 OAuth
+              跳转到这里登录，只保存返回的用户 id。
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );
