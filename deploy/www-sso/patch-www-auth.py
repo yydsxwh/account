@@ -53,6 +53,16 @@ if "COOKIE_DOMAIN" not in text:
         raise SystemExit("destroySession block not found")
     text = text.replace(old_destroy, new_destroy, 1)
 
+OLD_SIGNATURE = (
+    "async function provisionMissingUserFromJwt(payload: "
+    "{ id?: unknown; email?: unknown; name?: unknown; role?: unknown }) {"
+)
+NEW_SIGNATURE = (
+    "async function provisionMissingUserFromJwt(payload: Record<string, unknown>) {"
+)
+if OLD_SIGNATURE in text:
+    text = text.replace(OLD_SIGNATURE, NEW_SIGNATURE, 1)
+
 if "provisionMissingUserFromJwt" not in text:
     old_lookup = """    const user = await prisma.user.findUnique({
       where: { id },
@@ -110,7 +120,7 @@ const sessionUserSelect = {
   },
 } as const;
 
-async function provisionMissingUserFromJwt(payload: { id?: unknown; email?: unknown; name?: unknown; role?: unknown }) {
+async function provisionMissingUserFromJwt(payload: Record<string, unknown>) {
   const id = String(payload.id || "").trim();
   const email = String(payload.email || "").trim().toLowerCase();
   const name = String(payload.name || "").trim() || "用户";
