@@ -6,6 +6,7 @@ import {
   productLoginSearch,
   readProductLoginQuery,
 } from "@/helpers/oauth-query";
+import { keepNextHref } from "@andyyyds/shared/first-party-url";
 
 function loginHref(input: {
   next?: string;
@@ -15,11 +16,7 @@ function loginHref(input: {
 }) {
   const product = readProductLoginQuery(input);
   if (product) return `/login?${productLoginSearch(product)}`;
-  const next = input.next;
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/login";
-  }
-  return `/login?next=${encodeURIComponent(next)}`;
+  return keepNextHref("/login", input.next);
 }
 
 export default async function RegisterPage({

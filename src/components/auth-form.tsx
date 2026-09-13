@@ -33,6 +33,10 @@ import {
   isWeChatBrowser,
 } from "@andyyyds/shared/wechat-env";
 import { WechatLogin } from "@andyyyds/shared/wechat-login-plugin";
+import {
+  safeNextTarget,
+  wechatReturnPath,
+} from "@andyyyds/shared/first-party-url";
 
 type AuthChannel = "email" | "account" | "phone" | "wechat";
 
@@ -60,11 +64,17 @@ type MethodsState = {
   smsTestMode: boolean;
 };
 
-/** 仅允许站内相对路径，防止开放重定向 */
+/** 站内相对路径，或主站 / 账号中心的 https 地址 */
 function safeNextPath(raw: string | null): string | null {
-  if (!raw) return null;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
-  return raw;
+  return safeNextTarget(raw);
+}
+
+function goAfterAuth(nextPath: string | null, fallback = "/account") {
+  if (nextPath && (nextPath.startsWith("http://") || nextPath.startsWith("https://"))) {
+    window.location.assign(nextPath);
+    return;
+  }
+  window.location.assign(nextPath || fallback);
 }
 
 /**
@@ -221,14 +231,7 @@ export function AuthForm({
     }
     // 约搭等流程会带 ?next=，登录后回到原页面继续报名/发起
     const nextPath = safeNextPath(search.get("next"));
-    if (nextPath) {
-      router.push(nextPath);
-      router.refresh();
-      return;
-    }
-    // 本仓库只有账号中心，登录/注册成功后统一进个人中心
-    router.push("/account");
-    router.refresh();
+    goAfterAuth(nextPath);
   }
 
   async function onEmailSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -357,8 +360,7 @@ export function AuthForm({
     const clientId = (search.get("client_id") || "").trim();
     const redirectUri = (search.get("redirect_uri") || "").trim();
     const oauthState = (search.get("state") || "").trim();
-    let nextPath =
-      safeNextPath(search.get("next")) || "/";
+    let nextPath = wechatReturnPath(search.get("next"), "/");
     if (clientId && redirectUri) {
       const authorize = new URLSearchParams({
         client_id: clientId,
@@ -442,10 +444,10 @@ export function AuthForm({
         setLoading(false);
         return;
       }
-      const nextPath =
-        safeNextPath(
-          new URLSearchParams(window.location.search).get("next"),
-        ) || "/account";
+      const nextPath = wechatReturnPath(
+        new URLSearchParams(window.location.search).get("next"),
+        "/account",
+      );
       const res = await fetch("/api/auth/wechat/mobile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -6,7 +6,7 @@
  * 需要登录的 API / 页面先 getSession()，没有则 401 或跳转 /login。
  */
 
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { hashPassword, makeReferralCode, verifyPassword } from "./password";
@@ -80,6 +80,66 @@ export async function destroySession() {
   });
 }
 
+const sessionSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  roles: true,
+  avatarUrl: true,
+  requestedRole: true,
+  roleApplicationStatus: true,
+} as const;
+
+/**
+ * 主站先登录、账号中心库还没同步到时：用 JWT 先落一条本地用户，
+ * 避免共享 Cookie 校验通过却查不到人。密码哈希由双向同步补上。
+ */
+async function provisionUserFromJwt(payload: JWTPayload) {
+  const id = String(payload.id || "").trim();
+  const email = String(payload.email || "").trim().toLowerCase();
+  const name = String(payload.name || "").trim() || "用户";
+  const role = String(payload.role || "STUDENT").trim() || "STUDENT";
+  if (!id || !email) return null;
+
+  const emailOwner = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (emailOwner && emailOwner.id !== id) return null;
+  if (emailOwner?.id === id) {
+    return prisma.user.findUnique({ where: { id }, select: sessionSelect });
+  }
+
+  let referralCode = makeReferralCode();
+  for (let i = 0; i < 8; i += 1) {
+    const taken = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true },
+    });
+    if (!taken) break;
+    referralCode = makeReferralCode();
+  }
+
+  try {
+    await prisma.user.create({
+      data: {
+        id,
+        email,
+        name,
+        role,
+        roles: role,
+        passwordHash: await hashPassword(`!sso-pending!${id}`),
+        passwordSet: false,
+        referralCode,
+      },
+    });
+  } catch {
+    return prisma.user.findUnique({ where: { id }, select: sessionSelect });
+  }
+  return prisma.user.findUnique({ where: { id }, select: sessionSelect });
+}
+
 export async function getSession(): Promise<SessionUser | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
@@ -88,19 +148,13 @@ export async function getSession(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
     const id = String(payload.id);
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        roles: true,
-        avatarUrl: true,
-        requestedRole: true,
-        roleApplicationStatus: true,
-      },
+      select: sessionSelect,
     });
+    if (!user) {
+      user = await provisionUserFromJwt(payload);
+    }
     if (!user) return null;
     const roles = normalizeRoles({
       role: user.role,
