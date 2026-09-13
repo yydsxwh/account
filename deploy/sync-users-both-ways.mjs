@@ -361,9 +361,13 @@ try {
   ensureKkColumn(acc, "account");
   sync("www", www, "account", acc);
   sync("account", acc, "www", www);
-  const copied = copySettings(www, acc);
-  if (copied.length) {
-    console.log(`[sync] copied empty account settings: ${copied.join(",")}`);
+  const copiedToAccount = copySettings(www, acc);
+  if (copiedToAccount.length) {
+    console.log(`[sync] copied empty account settings: ${copiedToAccount.join(",")}`);
+  }
+  const copiedToWww = copySettings(acc, www);
+  if (copiedToWww.length) {
+    console.log(`[sync] copied empty www settings: ${copiedToWww.join(",")}`);
   }
   console.log(
     `[sync] www users=${www.prepare("SELECT count(*) AS n FROM User").get().n} account users=${acc.prepare("SELECT count(*) AS n FROM User").get().n}${DRY_RUN ? " (dry-run)" : ""}`,

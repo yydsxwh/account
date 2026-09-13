@@ -3,6 +3,11 @@
  * 关测试模式且阿里云参数齐全时，验证码发到用户手机。
  */
 
+import {
+  ALIYUN_SMS_LOGIN_TEMPLATE,
+  ALIYUN_SMS_SIGN_NAME,
+} from "./sms-templates";
+
 export type SmsSettingsInput = {
   smsEnabled: boolean;
   smsTestMode: boolean;
@@ -50,8 +55,12 @@ export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
   const accessKeyId = settings.smsAccessKeyId.trim() || envAccessKeyId;
   const accessKeySecret =
     settings.smsAccessKeySecret.trim() || envAccessKeySecret;
-  const signName = settings.smsSignName.trim() || envSignName;
-  const templateCode = settings.smsTemplateCode.trim() || envTemplateCode;
+  const signName =
+    settings.smsSignName.trim() || envSignName || ALIYUN_SMS_SIGN_NAME;
+  const templateCode =
+    settings.smsTemplateCode.trim() ||
+    envTemplateCode ||
+    ALIYUN_SMS_LOGIN_TEMPLATE;
   const aliyunReady = Boolean(
     accessKeyId && accessKeySecret && signName && templateCode,
   );
@@ -63,8 +72,10 @@ export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
   );
 
   const enabled = envFlag("SMS_ENABLED") ?? settings.smsEnabled;
-  // 只看测试开关，不再被历史字段 smsProvider=test 锁死（否则关测试模式仍发不出短信）
-  const testMode = envFlag("SMS_TEST_MODE") ?? settings.smsTestMode;
+  // 库里的开关为准。SMS_FORCE_TEST_MODE=1 才强制走测试（紧急回退）。
+  // 不再让 .env 里的 SMS_TEST_MODE=1 盖掉站长在后台关掉的测试模式。
+  const forceTest = envFlag("SMS_FORCE_TEST_MODE") === true;
+  const testMode = forceTest || settings.smsTestMode;
 
   return {
     enabled,

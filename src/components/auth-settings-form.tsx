@@ -100,7 +100,12 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
       <section className="surface space-y-3 rounded-[28px] p-5">
         <h2 className="text-lg font-semibold">手机号验证码</h2>
         <p className="text-sm text-[var(--muted)]">
-          用户填写手机号后收取 6 位验证码，即可注册或登录。关闭测试模式并配好阿里云后，验证码会发到手机。
+          用户填写手机号后收取 6 位验证码，即可注册、登录，或在个人中心绑定到已有账号。关闭测试模式并填好 AccessKey 后，验证码会发到手机。
+        </p>
+        <p className="rounded-2xl bg-[var(--bg-deep)]/50 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+          阿里云国内短信已过审：签名「歪歪滴艾斯杭州科技」，注册登录模板
+          SMS_512395568，备用验证码模板 SMS_338610504。下面签名和模板已按过审项填好，一般只需再填
+          AccessKey，关掉测试模式。
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -157,6 +162,12 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             已从环境变量读到部分阿里云参数，页面里留空的项会用 .env 补齐。
           </p>
         ) : null}
+        {!form.smsAliyunReady ? (
+          <p className="text-sm text-amber-800">
+            还缺阿里云 AccessKey。到 RAM 用户里建一对 AccessKey，把 Id 和
+            Secret 填在下面，保存后再关掉测试模式，验证码才会发到手机。
+          </p>
+        ) : null}
         <label className="block text-sm">
           阿里云 AccessKeyId
           <input
@@ -181,7 +192,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             className="field mt-1"
             value={form.smsSignName}
             onChange={(e) => set("smsSignName", e.target.value)}
-            placeholder="控制台审核通过的签名"
+            placeholder="歪歪滴艾斯杭州科技"
           />
         </label>
         <label className="block text-sm">
@@ -190,7 +201,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             className="field mt-1"
             value={form.smsTemplateCode}
             onChange={(e) => set("smsTemplateCode", e.target.value)}
-            placeholder="SMS_123456789"
+            placeholder="SMS_512395568"
           />
         </label>
         <div className="rounded-2xl bg-[var(--bg-deep)]/50 p-3">

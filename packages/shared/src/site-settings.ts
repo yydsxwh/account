@@ -93,8 +93,8 @@ export function publicSiteSettings(row: SiteSettingsRow) {
     smsAccessKeySecret: row.smsAccessKeySecret
       ? maskSecret(row.smsAccessKeySecret)
       : "",
-    smsSignName: row.smsSignName || "",
-    smsTemplateCode: row.smsTemplateCode || "",
+    smsSignName: row.smsSignName || sms.signName || "",
+    smsTemplateCode: row.smsTemplateCode || sms.templateCode || "",
     smsTestMode: sms.testMode,
     smsTestFixedCode: row.smsTestFixedCode || "",
     smsAliyunReady: sms.aliyunReady,
