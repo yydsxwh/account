@@ -22,3 +22,4 @@ fi
 npx prisma generate
 npx prisma db push --schema="$ROOT/prisma/schema.prisma"
 node "$ROOT/deploy/ensure-admin.mjs"
+node "$ROOT/deploy/backfill-kk-numbers.mjs"

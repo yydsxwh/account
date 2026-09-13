@@ -32,11 +32,14 @@ import {
   type Role,
 } from "@andyyyds/shared/roles";
 import { requireAdmin, studioErrorResponse } from "@andyyyds/shared/studio";
+import { parseKkNumber } from "@andyyyds/shared/kk-number";
 
 const userSelect = {
   id: true,
   name: true,
   email: true,
+  username: true,
+  kkNumber: true,
   role: true,
   roles: true,
   requestedRole: true,
@@ -68,6 +71,7 @@ export async function GET(req: Request) {
     await requireAdmin();
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") || "").trim();
+    const kkQuery = parseKkNumber(q);
     const role = (url.searchParams.get("role") || "").trim().toUpperCase();
     const pendingOnly = url.searchParams.get("pending") === "1";
 
@@ -79,7 +83,9 @@ export async function GET(req: Request) {
                 OR: [
                   { name: { contains: q } },
                   { email: { contains: q } },
+                  { username: { contains: q } },
                   { adminNote: { contains: q } },
+                  ...(kkQuery != null ? [{ kkNumber: kkQuery }] : []),
                 ],
               }
             : {},
@@ -128,6 +134,8 @@ export async function GET(req: Request) {
         id: u.id,
         name: u.name,
         email: u.email,
+        username: u.username || "",
+        kkNumber: u.kkNumber,
         role: u.role,
         roles: normalizeRoles({ role: u.role, roles: u.roles }),
         rolesLabel: roleLabels({ role: u.role, roles: u.roles }),

@@ -25,6 +25,11 @@ export async function SiteHeader() {
               >
                 <UserAvatar name={session.name} src={avatarUrl} size="xs" />
                 <span>{session.name}</span>
+                {session.kkNumber ? (
+                  <span className="font-mono text-xs text-[var(--muted)]">
+                    {session.kkNumber}
+                  </span>
+                ) : null}
                 <span className="text-xs text-[var(--muted)]">
                   {roleLabels(session)}
                 </span>

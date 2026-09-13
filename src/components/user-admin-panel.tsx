@@ -38,6 +38,8 @@ export type AdminUserRow = {
   id: string;
   name: string;
   email: string;
+  username: string;
+  kkNumber: number | null;
   role: string;
   /** 全部身份；站长可多选 */
   roles: Role[];
@@ -70,6 +72,18 @@ type Props = {
 };
 
 type Tab = "all" | "applications";
+
+function userIdentity(user: Pick<AdminUserRow, "email" | "username" | "kkNumber">) {
+  return (
+    <>
+      <div className="text-xs text-[var(--muted)]">{user.email}</div>
+      <div className="text-xs text-[var(--muted)]">
+        kk号 {user.kkNumber ?? "—"}
+        {user.username ? ` · ${user.username}` : ""}
+      </div>
+    </>
+  );
+}
 
 export function UserAdminPanel({ initialUsers, initialPending }: Props) {
   const router = useRouter();
@@ -112,6 +126,8 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
       return (
         u.name.toLowerCase().includes(keyword) ||
         u.email.toLowerCase().includes(keyword) ||
+        String(u.kkNumber || "").includes(keyword) ||
+        (u.username || "").toLowerCase().includes(keyword) ||
         u.referralCode.toLowerCase().includes(keyword) ||
         (u.adminNote || "").toLowerCase().includes(keyword) ||
         (u.referredByName || "").toLowerCase().includes(keyword) ||
@@ -410,7 +426,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <input
             className="w-full min-w-0 flex-1 rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-3 text-base outline-none focus:border-[var(--brand)] sm:text-sm"
-            placeholder="搜索姓名 / 邮箱 / 邀请码 / 邀请人 / 备注"
+            placeholder="搜索姓名 / kk号 / 自设账号 / 邮箱 / 邀请码 / 邀请人 / 备注"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -443,7 +459,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <div className="font-medium">{user.name}</div>
-                    <div className="text-xs text-[var(--muted)]">{user.email}</div>
+                    {userIdentity(user)}
                   </div>
                   {statusBadge(user.roleApplicationStatus)}
                 </div>
@@ -516,9 +532,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium">{user.name}</div>
-                        <div className="text-xs text-[var(--muted)]">
-                          {user.email}
-                        </div>
+                        {userIdentity(user)}
                       </td>
                       <td className="px-4 py-3">
                         {isElevatedApplyRole(user.requestedRole)
@@ -595,7 +609,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
               >
                 <div>
                   <div className="font-medium">{user.name}</div>
-                  <div className="text-xs text-[var(--muted)]">{user.email}</div>
+                  {userIdentity(user)}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span>
@@ -721,9 +735,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium">{user.name}</div>
-                        <div className="text-xs text-[var(--muted)]">
-                          {user.email}
-                        </div>
+                        {userIdentity(user)}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <input
                             className="field min-h-9 min-w-[7rem] max-w-[10rem] py-1.5 text-xs uppercase tracking-wide"

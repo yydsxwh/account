@@ -10,7 +10,8 @@
 
 ## 功能
 
-- 邮箱 / 登录名 / 手机验证码 / 微信 登录与注册
+- 邮箱 / kk号 / 自设账号 / 手机验证码 / 微信 登录与注册
+- 注册后自动发 kk 号（从 3 位数 100 起，人多了自动加长）；也可自设英文+数字账号（类似微信号）
 - 个人中心：绑定方式、改密码、角色申请
 - 站长：用户管理、软件产品登记、登录设置
 - 多产品单点登录：`/api/oauth/authorize` → `/api/oauth/token` → `/api/oauth/userinfo`
@@ -70,6 +71,19 @@ sudo certbot --nginx -d account.yydsxwh.com
 4. 「软件产品」里登记其他产品的回调地址。产品按 `/integrate` 接入。
 
 `COOKIE_DOMAIN=.yydsxwh.com` 让同父域名的产品更容易共用登录态。
+
+## 和 www.yydsxwh.com 共用用户
+
+主站以前自己注册的用户，用 `deploy/sync-users-both-ways.mjs` 按同一 `id` 和密码哈希同步进账号中心（反向也会把账号中心新用户写回主站）。线上每 2 分钟跑一次。
+
+主站 `/login`、`/register` 会跳到 `https://account.yydsxwh.com`，登录成功后回到 www。两边 `AUTH_SECRET` 必须相同，Cookie 名都是 `yyds_session`。
+
+在已经部署好的这台机器上：
+
+```bash
+bash /var/www/account/deploy/apply-live-sso.sh
+# 然后分别重新编译账号中心和主站
+```
 
 首次启动若库是空的，会按 `.env.production` 里的 `BOOTSTRAP_ADMIN_*` 自动建站长。不要对已有数据跑 `npm run db:seed`（会清空用户）。
 
