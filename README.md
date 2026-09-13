@@ -33,22 +33,38 @@ npm run dev
 
 ## 独立部署（和主站同一台 nginx）
 
-www.yydsxwh.com 已在一台 Ubuntu + nginx 上。账号中心用 Docker 占本机 `3001` 端口，再用子域名反代。
+www.yydsxwh.com 已在一台 Ubuntu + nginx 上。这台机器本机端口已经占用：
+
+- `3000` www / 安妮艾斯（pm2 `yyds-course`）
+- `3001` xiaowenhua.net
+- `3002` zhouyuding0825.com
+
+账号中心用 **3003**，只新增 nginx 站点和一个 systemd 服务，不要改现有三个站点的配置、证书和数据。
 
 1. 域名解析里加一条：`account` → 这台服务器 IP（A 记录）。
-2. 在服务器上：
+2. 在服务器上（当前线上机没有 Docker，按现有站点同样用 Node + systemd）：
 
 ```bash
-git clone https://github.com/yydsxwh/account.git
-cd account
+sudo mkdir -p /var/www/account
+sudo chown admin:admin /var/www/account
+git clone https://github.com/yydsxwh/account.git /var/www/account
+cd /var/www/account
 cp .env.production.example .env.production
 # 改 AUTH_SECRET、BOOTSTRAP_ADMIN_EMAIL、BOOTSTRAP_ADMIN_PASSWORD
-docker compose up -d --build
+npm ci
+npx prisma generate
+npm run build
+bash deploy/bootstrap-host.sh
+sudo cp deploy/account.yydsxwh.com.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now account.yydsxwh.com
 sudo cp deploy/nginx-account.yydsxwh.com.conf /etc/nginx/sites-available/account.yydsxwh.com
-sudo ln -s /etc/nginx/sites-available/account.yydsxwh.com /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/account.yydsxwh.com /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d account.yydsxwh.com
 ```
+
+若以后单独用 Docker，映射必须是 `3003:3000`，不要占用 3001。
 
 3. 浏览器打开 https://account.yydsxwh.com ，用你设的站长邮箱登录。
 4. 「软件产品」里登记其他产品的回调地址。产品按 `/integrate` 接入。
