@@ -25,7 +25,7 @@ export default async function StudioSettingsPage() {
       <div>
         <h1 className="text-3xl font-semibold">登录设置</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          配置短信验证码与微信授权。密钥保存后只显示打码，留空或保持星号表示不改。
+          手机号验证码可发到用户手机。密钥保存后只显示打码，留空或保持星号表示不改。
         </p>
       </div>
       <AuthSettingsForm initial={publicSiteSettings(row)} />

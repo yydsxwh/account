@@ -24,6 +24,7 @@ import {
   type ApplyableRole,
 } from "@andyyyds/shared/roles";
 import { REFERRAL_STORAGE_KEY } from "@andyyyds/shared/invite";
+import { maskPhone, normalizePhone } from "@andyyyds/shared/phone";
 import { PENDING_REVIEW_MESSAGE } from "@andyyyds/shared/role-applications";
 import { normalizeReferralCode } from "@andyyyds/shared/referral-code";
 import { preferWechatFromClient } from "@andyyyds/shared/auth-channel-preference";
@@ -32,6 +33,10 @@ import {
   isWeChatBrowser,
 } from "@andyyyds/shared/wechat-env";
 import { WechatLogin } from "@andyyyds/shared/wechat-login-plugin";
+import {
+  safeNextTarget,
+  wechatReturnPath,
+} from "@andyyyds/shared/first-party-url";
 
 type AuthChannel = "email" | "account" | "phone" | "wechat";
 
@@ -59,30 +64,37 @@ type MethodsState = {
   smsTestMode: boolean;
 };
 
-/** 仅允许站内相对路径，防止开放重定向 */
+/** 站内相对路径，或主站 / 账号中心的 https 地址 */
 function safeNextPath(raw: string | null): string | null {
-  if (!raw) return null;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
-  return raw;
+  return safeNextTarget(raw);
+}
+
+function goAfterAuth(nextPath: string | null, fallback = "/account") {
+  if (nextPath && (nextPath.startsWith("http://") || nextPath.startsWith("https://"))) {
+    window.location.assign(nextPath);
+    return;
+  }
+  window.location.assign(nextPath || fallback);
 }
 
 /**
  * 是否把默认 Tab 定在微信。
- * 微信内无公众号配置时授权按钮不可用 → 回退；
- * PC 扫码未就绪仍默认可进微信 Tab（展示现有说明，勿空白）。
+ * 微信内无公众号配置时授权按钮不可用 → 回退到手机号；
+ * 站外浏览器仅在扫码已配置时才默认微信，否则优先手机号验证码。
  */
 function shouldDefaultToWechat(
   inWeChat: boolean,
   methods: Pick<MethodsState, "wechat" | "wechatQr">,
 ): boolean {
   if (inWeChat) return methods.wechat;
-  return true;
+  return methods.wechatQr;
 }
 
-/** 微信不可用时的回退：账号密码（不依赖短信/扫码配置） */
+/** 微信不可用时：有短信就走手机号，否则账号密码 */
 function fallbackChannel(
-  _methods?: Pick<MethodsState, "phone" | "email">,
+  methods?: Pick<MethodsState, "phone" | "email">,
 ): AuthChannel {
+  if (methods?.phone) return "phone";
   return "account";
 }
 
@@ -198,25 +210,37 @@ export function AuthForm({
     pendingReview?: boolean;
     message?: string;
     isNewUser?: boolean;
+    kkNumber?: number;
   }) {
+    const search = new URLSearchParams(window.location.search);
+    const clientId = (search.get("client_id") || "").trim();
+    const redirectUri = (search.get("redirect_uri") || "").trim();
+    const oauthState = (search.get("state") || "").trim();
+    if (clientId && redirectUri) {
+      const authorize = new URL("/api/oauth/authorize", window.location.origin);
+      authorize.searchParams.set("client_id", clientId);
+      authorize.searchParams.set("redirect_uri", redirectUri);
+      if (oauthState) authorize.searchParams.set("state", oauthState);
+      window.location.assign(authorize.toString());
+      return;
+    }
+    const newKk = data.isNewUser && data.kkNumber ? String(data.kkNumber) : "";
     if (data.pendingReview) {
       setNotice(data.message || PENDING_REVIEW_MESSAGE);
-      router.push("/account?pending=1");
+      router.push(newKk ? `/account?pending=1&kk=${newKk}` : "/account?pending=1");
       router.refresh();
       return;
     }
     // 约搭等流程会带 ?next=，登录后回到原页面继续报名/发起
-    const nextPath = safeNextPath(
-      new URLSearchParams(window.location.search).get("next"),
-    );
-    if (nextPath) {
-      router.push(nextPath);
-      router.refresh();
+    const nextPath = safeNextPath(search.get("next"));
+    if (!newKk) {
+      goAfterAuth(nextPath);
       return;
     }
-    // 本仓库只有账号中心，登录/注册成功后统一进个人中心
-    router.push("/account");
-    router.refresh();
+    // 新号先回个人中心报出 kk 号，再让用户自己继续，免得没看见号就被带走
+    const welcome = new URLSearchParams({ kk: newKk });
+    if (nextPath) welcome.set("next", nextPath);
+    goAfterAuth(`/account?${welcome.toString()}`);
   }
 
   async function onEmailSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -301,8 +325,8 @@ export function AuthForm({
     setCooldown(Number(data.cooldownSec) || 60);
     setNotice(
       data.testMode
-        ? "测试模式：请查看服务器日志中的验证码，或使用系统设置里的固定测试码"
-        : "验证码已发送，请查收短信",
+        ? `测试模式：验证码已写入服务器日志，或使用固定测试码（默认 123456）。正式环境关闭测试模式后会发到 ${maskPhone(normalizePhone(phone)) || "该手机"}。`
+        : `验证码已发送到 ${maskPhone(normalizePhone(phone)) || "该手机"}，5 分钟内有效`,
     );
   }
 
@@ -341,10 +365,19 @@ export function AuthForm({
   }
 
   function buildWechatLoginParams() {
-    const nextPath =
-      safeNextPath(
-        new URLSearchParams(window.location.search).get("next"),
-      ) || "/";
+    const search = new URLSearchParams(window.location.search);
+    const clientId = (search.get("client_id") || "").trim();
+    const redirectUri = (search.get("redirect_uri") || "").trim();
+    const oauthState = (search.get("state") || "").trim();
+    let nextPath = wechatReturnPath(search.get("next"), "/");
+    if (clientId && redirectUri) {
+      const authorize = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+      });
+      if (oauthState) authorize.set("state", oauthState);
+      nextPath = `/api/oauth/authorize?${authorize.toString()}`;
+    }
     const params = new URLSearchParams({
       purpose: "login",
       returnUrl: nextPath,
@@ -420,10 +453,10 @@ export function AuthForm({
         setLoading(false);
         return;
       }
-      const nextPath =
-        safeNextPath(
-          new URLSearchParams(window.location.search).get("next"),
-        ) || "/account";
+      const nextPath = wechatReturnPath(
+        new URLSearchParams(window.location.search).get("next"),
+        "/account",
+      );
       const res = await fetch("/api/auth/wechat/mobile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -481,8 +514,8 @@ export function AuthForm({
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           {mode === "login"
-            ? "可用微信、账号密码、手机号或邮箱登录。"
-            : "可用微信、账号密码、手机号或邮箱注册。普通用户即用；加盟代理 / 入驻商家 / 老师需站长审核。"}
+            ? "可用微信、kk号 / 自设账号、手机号或邮箱登录。"
+            : "注册后自动获得 kk 号。也可用微信、自设账号、手机号或邮箱。普通用户即用；加盟代理 / 入驻商家 / 老师需站长审核。"}
         </p>
       </div>
 
@@ -517,8 +550,9 @@ export function AuthForm({
       {channel === "account" ? (
         <form onSubmit={onAccountSubmit} className="space-y-4">
           <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-            使用登录账号 + 密码（不是邮箱）。账号为 4–20
-            位，小写字母开头，仅含字母、数字、下划线。
+            {mode === "login"
+              ? "可用系统自动分配的 kk 号（数字，类似 QQ 号），或自己设置的英文数字账号（类似微信号）登录。"
+              : "注册后会自动发一个 kk 号，从 3 位数起，越早注册号码越短。也可另设一串英文+数字账号，类似微信号。"}
           </p>
           {mode === "register" ? (
             <input className="field" name="name" placeholder="昵称" required />
@@ -527,9 +561,13 @@ export function AuthForm({
             className="field"
             name="username"
             autoComplete="username"
-            placeholder="登录账号"
+            placeholder={
+              mode === "login"
+                ? "kk号 或 自设账号"
+                : "自设账号（可选，例如 yydsboss01）"
+            }
             spellCheck={false}
-            required
+            required={mode === "login"}
           />
           <input
             className="field"
@@ -635,11 +673,17 @@ export function AuthForm({
 
       {channel === "phone" ? (
         <form onSubmit={onPhoneSubmit} className="space-y-4">
-          {!methods.phone ? (
-            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-sm text-[var(--muted)]">
-              站长尚未启用短信登录。请在「系统设置 → 短信」开启测试模式或配置阿里云短信后重试。
+          {methods.phone ? (
+            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+              {mode === "login"
+                ? "输入手机号收取验证码即可登录。未注册会自动创建账号。"
+                : "输入手机号收取验证码即可注册。该手机号以后也可直接登录。"}
             </p>
-          ) : null}
+          ) : (
+            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-sm text-[var(--muted)]">
+              站长尚未启用短信登录。请在「登录设置」开启手机号验证码，或配置阿里云后关闭测试模式，验证码就会发到手机。
+            </p>
+          )}
           {mode === "register" ? (
             <input
               className="field"
@@ -701,9 +745,13 @@ export function AuthForm({
           ) : null}
           {methods.smsTestMode ? (
             <p className="text-xs text-[var(--muted)]">
-              当前为短信测试模式：验证码见服务器日志，或使用站长设置的固定测试码。
+              当前为测试模式：验证码见服务器日志，或使用站长设置的固定测试码（默认 123456）。配好阿里云并关闭测试模式后，验证码会发到手机。
             </p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-[var(--muted)]">
+              点击「获取验证码」后，请在手机短信里查看 6 位数字。
+            </p>
+          )}
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
           {notice ? (
             <p className="text-sm text-[var(--brand-strong)]">{notice}</p>

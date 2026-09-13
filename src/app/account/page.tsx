@@ -5,7 +5,9 @@ import { RoleApplyPanel } from "@/components/role-apply-panel";
 import { getSession } from "@andyyyds/shared/auth";
 import { isPlaceholderEmail } from "@andyyyds/shared/auth-email";
 import { prisma } from "@andyyyds/shared/db";
+import { safeNextTarget } from "@andyyyds/shared/first-party-url";
 import { inviteRegisterUrl } from "@andyyyds/shared/invite";
+import { listPublicProducts } from "@andyyyds/shared/oauth";
 import { availableAccountApplyRoles } from "@andyyyds/shared/role-applications";
 import {
   isAdmin,
@@ -19,27 +21,38 @@ import { resolveStoredAccessUrl } from "@andyyyds/shared/storage";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ kk?: string; pending?: string; next?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login?next=/account");
+  const params = await searchParams;
+  const justAssignedKk = params.kk?.trim() || "";
+  const continueTo = justAssignedKk ? safeNextTarget(params.next) : null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: {
-      referralCode: true,
-      roleApplicationNote: true,
-      roleApplicationStatus: true,
-      requestedRole: true,
-      email: true,
-      phone: true,
-      username: true,
-      wechatOpenId: true,
-      wechatWebOpenId: true,
-      wechatMobileOpenId: true,
-      avatarUrl: true,
-      passwordSet: true,
-    },
-  });
+  const [user, products] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.id },
+      select: {
+        referralCode: true,
+        roleApplicationNote: true,
+        roleApplicationStatus: true,
+        requestedRole: true,
+        email: true,
+        phone: true,
+        username: true,
+        kkNumber: true,
+        wechatOpenId: true,
+        wechatWebOpenId: true,
+        wechatMobileOpenId: true,
+        avatarUrl: true,
+        passwordSet: true,
+      },
+    }),
+    listPublicProducts(),
+  ]);
 
   const applyRoles = availableAccountApplyRoles(
     session,
@@ -77,6 +90,40 @@ export default async function AccountPage() {
         </p>
       </header>
 
+      {justAssignedKk ? (
+        <div className="rounded-[28px] border border-[var(--brand)]/30 bg-[var(--brand)]/8 px-5 py-4 text-sm">
+          <p>
+            注册成功，你的 kk 号是{" "}
+            <span className="font-mono font-semibold">{justAssignedKk}</span>
+            。请记下来，以后可用它登录。
+          </p>
+          {continueTo ? (
+            <a
+              href={continueTo}
+              className="btn btn-primary mt-3 inline-flex min-h-10 px-4"
+            >
+              继续
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      <section className="surface rounded-[28px] p-5 sm:p-6">
+        <p className="text-xs text-[var(--muted)]">kk号</p>
+        <p className="mt-1 font-mono text-4xl font-semibold tracking-wide text-[var(--ink)]">
+          {user?.kkNumber ?? session.kkNumber ?? "—"}
+        </p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          类似 QQ 号，注册时自动分配，越早越短。登录时可填 kk 号 + 密码。
+        </p>
+        <p className="mt-3 text-sm">
+          自设账号：
+          <span className="font-medium">
+            {user?.username || "未设置（可在下方设英文+数字，类似微信号）"}
+          </span>
+        </p>
+      </section>
+
       {session.rolePending ? (
         <div className="rounded-[28px] border border-amber-200 bg-amber-50/80 p-5">
           <h2 className="text-lg font-semibold text-amber-950">账号待站长审核</h2>
@@ -95,6 +142,30 @@ export default async function AccountPage() {
               "站长未通过你的角色申请。可在下方重新提交申请。"}
           </p>
         </div>
+      ) : null}
+
+      {products.length > 0 ? (
+        <section className="surface rounded-[28px] p-5 sm:p-6">
+          <h2 className="text-lg font-semibold">我的软件</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            用当前账号打开已接入的产品，不必再注册。
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {products.map((product) =>
+              product.homepageUrl ? (
+                <a
+                  key={product.clientId}
+                  href={product.homepageUrl}
+                  className="btn btn-secondary min-h-11 px-4"
+                >
+                  {product.name}
+                </a>
+              ) : (
+                <span key={product.clientId}>{product.name}</span>
+              ),
+            )}
+          </div>
+        </section>
       ) : null}
 
       <AccountProfilePanel

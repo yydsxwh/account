@@ -18,6 +18,8 @@ type Settings = {
   smsTemplateCode: string;
   smsTestMode: boolean;
   smsTestFixedCode: string;
+  smsAliyunReady?: boolean;
+  smsEnvConfigured?: boolean;
 };
 
 export function AuthSettingsForm({ initial }: { initial: Settings }) {
@@ -25,6 +27,8 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [testingSms, setTestingSms] = useState(false);
 
   function set<K extends keyof Settings>(key: K, value: Settings[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -55,6 +59,29 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
     }
   }
 
+  async function sendTestSms() {
+    setTestingSms(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch("/api/studio/settings/sms-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: testPhone }),
+      });
+      const data = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(data.error || "试发失败");
+        return;
+      }
+      setNotice(data.message || "已发送");
+    } catch {
+      setError("试发失败");
+    } finally {
+      setTestingSms(false);
+    }
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       <section className="surface space-y-3 rounded-[28px] p-5">
@@ -71,37 +98,72 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
       </section>
 
       <section className="surface space-y-3 rounded-[28px] p-5">
-        <h2 className="text-lg font-semibold">短信登录</h2>
+        <h2 className="text-lg font-semibold">手机号验证码</h2>
+        <p className="text-sm text-[var(--muted)]">
+          用户填写手机号后收取 6 位验证码，即可注册或登录。关闭测试模式并配好阿里云后，验证码会发到手机。
+        </p>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={form.smsEnabled}
             onChange={(e) => set("smsEnabled", e.target.checked)}
           />
-          启用手机号验证码登录
+          启用手机号验证码登录 / 注册
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.smsTestMode}
-            onChange={(e) => set("smsTestMode", e.target.checked)}
-          />
-          测试模式（验证码写日志，可用固定码）
-        </label>
-        <label className="block text-sm">
-          测试固定验证码
-          <input
-            className="field mt-1"
-            value={form.smsTestFixedCode}
-            onChange={(e) => set("smsTestFixedCode", e.target.value)}
-          />
-        </label>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">验证码怎么发</legend>
+          <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-2xl border border-[var(--line)] px-3 py-3 text-sm">
+            <input
+              type="radio"
+              className="mt-1"
+              checked={form.smsTestMode}
+              onChange={() => set("smsTestMode", true)}
+            />
+            <span>
+              测试模式（不发短信）
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                验证码写服务器日志，也可用下面的固定码联调。
+              </span>
+            </span>
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-2xl border border-[var(--line)] px-3 py-3 text-sm">
+            <input
+              type="radio"
+              className="mt-1"
+              checked={!form.smsTestMode}
+              onChange={() => set("smsTestMode", false)}
+            />
+            <span>
+              发送到用户手机（阿里云短信）
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                模板内容需包含变量 code，例如「您的验证码为 {'${code}'}」。
+              </span>
+            </span>
+          </label>
+        </fieldset>
+        {form.smsTestMode ? (
+          <label className="block text-sm">
+            测试固定验证码
+            <input
+              className="field mt-1"
+              value={form.smsTestFixedCode}
+              onChange={(e) => set("smsTestFixedCode", e.target.value)}
+              placeholder="123456"
+            />
+          </label>
+        ) : null}
+        {form.smsEnvConfigured ? (
+          <p className="text-xs text-[var(--muted)]">
+            已从环境变量读到部分阿里云参数，页面里留空的项会用 .env 补齐。
+          </p>
+        ) : null}
         <label className="block text-sm">
           阿里云 AccessKeyId
           <input
             className="field mt-1"
             value={form.smsAccessKeyId}
             onChange={(e) => set("smsAccessKeyId", e.target.value)}
+            placeholder="LTAI..."
           />
         </label>
         <label className="block text-sm">
@@ -110,6 +172,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             className="field mt-1"
             value={form.smsAccessKeySecret}
             onChange={(e) => set("smsAccessKeySecret", e.target.value)}
+            placeholder="保存后只显示打码"
           />
         </label>
         <label className="block text-sm">
@@ -118,6 +181,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             className="field mt-1"
             value={form.smsSignName}
             onChange={(e) => set("smsSignName", e.target.value)}
+            placeholder="控制台审核通过的签名"
           />
         </label>
         <label className="block text-sm">
@@ -126,8 +190,33 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             className="field mt-1"
             value={form.smsTemplateCode}
             onChange={(e) => set("smsTemplateCode", e.target.value)}
+            placeholder="SMS_123456789"
           />
         </label>
+        <div className="rounded-2xl bg-[var(--bg-deep)]/50 p-3">
+          <p className="text-sm font-medium">试发到手机</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            保存设置后，用自己的手机号测一次。测试模式不会真发短信。
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input
+              className="field min-w-0 flex-1"
+              type="tel"
+              inputMode="numeric"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="11 位手机号"
+            />
+            <button
+              type="button"
+              className="btn btn-secondary min-h-11 px-3"
+              disabled={testingSms || !testPhone.trim()}
+              onClick={() => void sendTestSms()}
+            >
+              {testingSms ? "发送中…" : "试发验证码"}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="surface space-y-3 rounded-[28px] p-5">

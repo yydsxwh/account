@@ -25,14 +25,27 @@ export async function SiteHeader() {
               >
                 <UserAvatar name={session.name} src={avatarUrl} size="xs" />
                 <span>{session.name}</span>
+                {session.kkNumber ? (
+                  <span className="font-mono text-xs text-[var(--muted)]">
+                    {session.kkNumber}
+                  </span>
+                ) : null}
                 <span className="text-xs text-[var(--muted)]">
                   {roleLabels(session)}
                 </span>
               </Link>
               {isAdmin(session) ? (
-                <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
-                  用户管理
-                </Link>
+                <>
+                  <Link href="/studio/apps" className="btn btn-secondary min-h-10 px-3">
+                    软件产品
+                  </Link>
+                  <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
+                    用户管理
+                  </Link>
+                  <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
+                    登录设置
+                  </Link>
+                </>
               ) : null}
               <form action="/api/auth/logout" method="post">
                 <button type="submit" className="btn btn-secondary min-h-10 px-3">
@@ -42,6 +55,9 @@ export async function SiteHeader() {
             </>
           ) : (
             <>
+              <Link href="/integrate" className="hidden min-h-10 items-center sm:inline-flex">
+                产品接入
+              </Link>
               <Link href="/login" className="btn btn-secondary min-h-10 px-3">
                 登录
               </Link>

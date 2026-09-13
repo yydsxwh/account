@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "./db";
+import { isSmsLoginReady, resolveSmsRuntime } from "./sms-config";
 
 export type SiteSettingsRow = {
   id: string;
@@ -62,6 +63,7 @@ export function isMaskedPlaceholder(value: string | undefined) {
 }
 
 export function publicSiteSettings(row: SiteSettingsRow) {
+  const sms = resolveSmsRuntime(row);
   return {
     siteUrl: row.siteUrl,
     wechatAppId: row.wechatAppId,
@@ -93,17 +95,11 @@ export function publicSiteSettings(row: SiteSettingsRow) {
       : "",
     smsSignName: row.smsSignName || "",
     smsTemplateCode: row.smsTemplateCode || "",
-    smsTestMode: row.smsTestMode !== false,
+    smsTestMode: sms.testMode,
     smsTestFixedCode: row.smsTestFixedCode || "",
-    smsLoginReady: Boolean(
-      row.smsEnabled &&
-        (row.smsTestMode ||
-          row.smsProvider === "test" ||
-          (row.smsAccessKeyId &&
-            row.smsAccessKeySecret &&
-            row.smsSignName &&
-            row.smsTemplateCode)),
-    ),
+    smsAliyunReady: sms.aliyunReady,
+    smsEnvConfigured: sms.usingEnvKeys,
+    smsLoginReady: isSmsLoginReady(row),
     updatedAt: row.updatedAt.toISOString(),
   };
 }

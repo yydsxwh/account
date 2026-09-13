@@ -14,7 +14,7 @@ import {
 import { APPLYABLE_ROLES } from "@andyyyds/shared/roles";
 
 const schema = z.object({
-  username: z.string().min(1).max(40),
+  username: z.string().max(40).optional().default(""),
   password: z.string().min(6).max(100),
   mode: z.enum(["login", "register"]).optional().default("login"),
   name: z.string().max(40).optional(),
@@ -27,9 +27,16 @@ export async function POST(req: Request) {
     const body = schema.parse(await req.json());
     const mode = body.mode || "login";
 
+    if (mode === "login" && !String(body.username || "").trim()) {
+      return NextResponse.json(
+        { error: "请填写 kk 号或自设账号" },
+        { status: 400 },
+      );
+    }
+
     if (mode === "register") {
       const { result } = await registerUserByUsername({
-        username: body.username,
+        username: body.username || undefined,
         password: body.password,
         name: body.name || "",
         referralCode: body.referralCode,

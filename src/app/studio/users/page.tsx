@@ -11,6 +11,8 @@ function mapUser(u: {
   id: string;
   name: string;
   email: string;
+  username: string | null;
+  kkNumber: number | null;
   role: string;
   roles: string;
   requestedRole: string;
@@ -39,6 +41,8 @@ function mapUser(u: {
     id: u.id,
     name: u.name,
     email: u.email,
+    username: u.username || "",
+    kkNumber: u.kkNumber,
     role: u.role,
     roles,
     rolesLabel: roleLabels(roles),
@@ -78,6 +82,8 @@ export default async function StudioUsersPage() {
     id: true,
     name: true,
     email: true,
+    username: true,
+    kkNumber: true,
     role: true,
     roles: true,
     requestedRole: true,
@@ -129,9 +135,14 @@ export default async function StudioUsersPage() {
             查看注册用户、邀请关系、审核角色申请；可为同一用户勾选多种身份。
           </p>
         </div>
-        <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
-          登录设置
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/studio/apps" className="btn btn-secondary min-h-10 px-3">
+            软件产品
+          </Link>
+          <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
+            登录设置
+          </Link>
+        </div>
       </div>
       <UserAdminPanel
         initialUsers={users.map(mapUser)}

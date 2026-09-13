@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// 账号：邮箱 / 登录名 / 手机 / 微信 四种方式可指向同一用户
+/// 账号：kk号 / 自设账号 / 邮箱 / 手机 / 微信 可指向同一用户
 model User {
   id           String  @id @default(cuid())
   email        String  @unique
@@ -15,7 +15,9 @@ model User {
   /// 是否已设置可用登录密码；手机/微信自动注册且未设密码时为 false
   passwordSet  Boolean @default(true)
   name         String
-  /// 账号密码登录用的登录名（小写存储）；空/null 表示未开通账号登录
+  /// 系统自动分配的 kk 号（类似 QQ 号），从 3 位数起，越早越短
+  kkNumber     Int?    @unique
+  /// 可自设账号（类似微信号，英文+数字）；空/null 表示尚未设置
   username     String? @unique
   bio          String  @default("")
   avatarUrl    String  @default("")
@@ -49,6 +51,12 @@ model User {
   @@index([wechatMobileOpenId])
   @@index([wechatUnionId])
   @@index([name])
+}
+
+/// kk 号发号器：next 为下一个将发出的数字
+model KkSequence {
+  id   String @id @default("default")
+  next Int    @default(100)
 }
 
 /// 短信验证码（手机号登录 / 绑定）；哈希存储，短时有效
@@ -89,4 +97,49 @@ model SiteSettings {
   smsTestFixedCode   String  @default("123456")
 
   updatedAt DateTime @updatedAt
+}
+
+/// 接入账号中心的软件产品（第一方应用）
+model OAuthClient {
+  id           String   @id @default(cuid())
+  /// 给产品配置的公开 ID，如 docs / shop
+  clientId     String   @unique
+  /// bcrypt 后的密钥；明文只在创建时展示一次
+  clientSecret String
+  name         String
+  /// 产品首页，个人中心「打开」用
+  homepageUrl  String   @default("")
+  /// JSON 字符串数组：登录成功后允许跳回的地址
+  redirectUris String   @default("[]")
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// 一次性授权码：产品用它向账号中心换用户
+model OAuthCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  clientId    String
+  userId      String
+  redirectUri String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([expiresAt])
+}
+
+/// 产品服务端持有的访问令牌
+model OAuthAccessToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  clientId  String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
