@@ -21,8 +21,14 @@ model User {
   username     String? @unique
   bio          String  @default("")
   avatarUrl    String  @default("")
-  /// 手机号登录用；空表示未绑定
+  /// 手机号登录用；空表示未绑定。站长后台看全文，不打码。
   phone        String  @default("")
+  /// 实名：真实姓名，用户在个人中心补充后站长可见
+  realName     String  @default("")
+  /// id_card | passport | hk_mo_tw | other
+  idType       String  @default("id_card")
+  idNumber     String  @default("")
+  realNameUpdatedAt DateTime?
   /// ADMIN 站长 | AGENT 加盟代理 | MERCHANT 入驻商家 | TEACHER 老师 | STUDENT 用户
   role         String  @default("STUDENT")
   /// 多角色：逗号分隔；空则仅用 role

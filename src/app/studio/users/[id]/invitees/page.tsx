@@ -28,6 +28,10 @@ export default async function InviteesPage({
           id: true,
           name: true,
           email: true,
+          phone: true,
+          realName: true,
+          idType: true,
+          idNumber: true,
           referralCode: true,
           role: true,
           roles: true,
@@ -59,6 +63,12 @@ export default async function InviteesPage({
               <div>
                 <div className="font-medium">{row.name}</div>
                 <div className="text-sm text-[var(--muted)]">{row.email}</div>
+                <div className="text-sm text-[var(--ink)]">
+                  手机 {row.phone?.trim() || "未绑定"}
+                  {row.realName?.trim()
+                    ? ` · 实名 ${row.realName}${row.idNumber?.trim() ? ` ${row.idNumber}` : ""}`
+                    : " · 实名未补充"}
+                </div>
               </div>
               <div className="text-sm text-[var(--muted)]">
                 {roleLabels({ role: row.role, roles: row.roles })} · {row.referralCode}

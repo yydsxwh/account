@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AccountAuthPanel } from "@/components/account-auth-panel";
 import { AccountProfilePanel } from "@/components/account-profile-panel";
+import { AccountRealNamePanel } from "@/components/account-real-name-panel";
 import { RoleApplyPanel } from "@/components/role-apply-panel";
 import { getSession } from "@andyyyds/shared/auth";
 import { isPlaceholderEmail } from "@andyyyds/shared/auth-email";
@@ -42,6 +43,9 @@ export default async function AccountPage({
         requestedRole: true,
         email: true,
         phone: true,
+        realName: true,
+        idType: true,
+        idNumber: true,
         username: true,
         kkNumber: true,
         wechatOpenId: true,
@@ -171,6 +175,12 @@ export default async function AccountPage({
       <AccountProfilePanel
         initialName={session.name}
         initialAvatarDisplayUrl={avatarDisplayUrl}
+      />
+
+      <AccountRealNamePanel
+        initialRealName={user?.realName || ""}
+        initialIdType={user?.idType || "id_card"}
+        initialIdNumber={user?.idNumber || ""}
       />
 
       <AccountAuthPanel

@@ -23,6 +23,7 @@ import {
   type Role,
   type RoleApplicationStatus,
 } from "@andyyyds/shared/roles";
+import { idTypeLabel } from "@andyyyds/shared/real-name";
 
 export type AdminInvitee = {
   id: string;
@@ -40,6 +41,11 @@ export type AdminUserRow = {
   email: string;
   username: string;
   kkNumber: number | null;
+  phone: string;
+  realName: string;
+  idType: string;
+  idNumber: string;
+  realNameUpdatedAt: string | null;
   role: string;
   /** 全部身份；站长可多选 */
   roles: Role[];
@@ -73,13 +79,37 @@ type Props = {
 
 type Tab = "all" | "applications";
 
-function userIdentity(user: Pick<AdminUserRow, "email" | "username" | "kkNumber">) {
+function userIdentity(
+  user: Pick<
+    AdminUserRow,
+    | "email"
+    | "username"
+    | "kkNumber"
+    | "phone"
+    | "realName"
+    | "idType"
+    | "idNumber"
+    | "realNameUpdatedAt"
+  >,
+) {
   return (
     <>
       <div className="text-xs text-[var(--muted)]">{user.email}</div>
       <div className="text-xs text-[var(--muted)]">
         kk号 {user.kkNumber ?? "—"}
         {user.username ? ` · ${user.username}` : ""}
+      </div>
+      <div className="text-xs text-[var(--ink)]">
+        手机 {user.phone?.trim() ? user.phone : "未绑定"}
+      </div>
+      <div className="text-xs text-[var(--ink)]">
+        {user.realName?.trim()
+          ? `实名 ${user.realName}${
+              user.idNumber?.trim()
+                ? ` · ${idTypeLabel(user.idType)} ${user.idNumber}`
+                : ""
+            }`
+          : "实名 未补充"}
       </div>
     </>
   );
@@ -128,6 +158,9 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
         u.email.toLowerCase().includes(keyword) ||
         String(u.kkNumber || "").includes(keyword) ||
         (u.username || "").toLowerCase().includes(keyword) ||
+        (u.phone || "").includes(keyword) ||
+        (u.realName || "").toLowerCase().includes(keyword) ||
+        (u.idNumber || "").toLowerCase().includes(keyword) ||
         u.referralCode.toLowerCase().includes(keyword) ||
         (u.adminNote || "").toLowerCase().includes(keyword) ||
         (u.referredByName || "").toLowerCase().includes(keyword) ||
@@ -426,7 +459,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <input
             className="w-full min-w-0 flex-1 rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-3 text-base outline-none focus:border-[var(--brand)] sm:text-sm"
-            placeholder="搜索姓名 / kk号 / 自设账号 / 邮箱 / 邀请码 / 邀请人 / 备注"
+            placeholder="搜索姓名 / 手机号 / 实名 / 证件号 / kk号 / 自设账号 / 邮箱 / 邀请码 / 邀请人 / 备注"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -862,7 +895,7 @@ export function UserAdminPanel({ initialUsers, initialPending }: Props) {
       <p className="text-xs text-[var(--muted)]">
         {tab === "applications"
           ? `待审核 ${pending.length} 人。通过后立即开通对应角色权限；拒绝后保留原身份（注册待审账号仍为普通用户）。`
-          : `共 ${filtered.length} 人（最多展示最近 200 人）。「被谁邀请 / 邀请了谁」按注册时的邀请关系展示；点击「查看详情」可打开完整下级列表、统计并导出 Excel。可勾选多种身份（如老师+商家），保存后立即生效。「站长备注」仅后台可见，不会展示给用户本人。至少保留一位站长。`}
+          : `共 ${filtered.length} 人（最多展示最近 200 人）。手机号、真实姓名和证件号仅后台可见，用户用手机号注册/登录/绑定后会显示在这里。「被谁邀请 / 邀请了谁」按注册时的邀请关系展示；点击「查看详情」可打开完整下级列表、统计并导出 Excel。可勾选多种身份（如老师+商家），保存后立即生效。「站长备注」仅后台可见，不会展示给用户本人。至少保留一位站长。`}
       </p>
     </div>
   );

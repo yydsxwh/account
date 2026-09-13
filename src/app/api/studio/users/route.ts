@@ -1,7 +1,7 @@
 /**
  * GET/PATCH /api/studio/users —— 站长用户管理
  *
- * - GET：列表（?pending=1 仅待审申请；q 可搜姓名/邮箱/站长备注）
+ * - GET：列表（?pending=1 仅待审申请；q 可搜姓名/手机/实名/邮箱/站长备注）
  * - PATCH { userId, roles: Role[] } 或 { userId, role }：设置多角色 / 单角色
  * - PATCH { userId, referralCode }：设置邀请码（含站长自己）
  * - PATCH { userId, adminNote }：设置站长内部备注（仅后台可见）
@@ -40,6 +40,11 @@ const userSelect = {
   email: true,
   username: true,
   kkNumber: true,
+  phone: true,
+  realName: true,
+  idType: true,
+  idNumber: true,
+  realNameUpdatedAt: true,
   role: true,
   roles: true,
   requestedRole: true,
@@ -55,14 +60,26 @@ function serializeUser<
     role: string;
     roles: string;
     roleReviewedAt: Date | null;
+    realNameUpdatedAt?: Date | null;
+    phone?: string | null;
+    realName?: string | null;
+    idType?: string | null;
+    idNumber?: string | null;
   },
 >(u: T) {
   const roles = normalizeRoles({ role: u.role, roles: u.roles });
   return {
     ...u,
+    phone: u.phone || "",
+    realName: u.realName || "",
+    idType: u.idType || "id_card",
+    idNumber: u.idNumber || "",
     roles,
     rolesLabel: roleLabels(roles),
     roleReviewedAt: u.roleReviewedAt?.toISOString() ?? null,
+    realNameUpdatedAt: u.realNameUpdatedAt
+      ? u.realNameUpdatedAt.toISOString()
+      : null,
   };
 }
 
@@ -84,6 +101,9 @@ export async function GET(req: Request) {
                   { name: { contains: q } },
                   { email: { contains: q } },
                   { username: { contains: q } },
+                  { phone: { contains: q } },
+                  { realName: { contains: q } },
+                  { idNumber: { contains: q } },
                   { adminNote: { contains: q } },
                   ...(kkQuery != null ? [{ kkNumber: kkQuery }] : []),
                 ],
@@ -136,6 +156,11 @@ export async function GET(req: Request) {
         email: u.email,
         username: u.username || "",
         kkNumber: u.kkNumber,
+        phone: u.phone || "",
+        realName: u.realName || "",
+        idType: u.idType || "id_card",
+        idNumber: u.idNumber || "",
+        realNameUpdatedAt: u.realNameUpdatedAt?.toISOString() ?? null,
         role: u.role,
         roles: normalizeRoles({ role: u.role, roles: u.roles }),
         rolesLabel: roleLabels({ role: u.role, roles: u.roles }),
