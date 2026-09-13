@@ -37,6 +37,9 @@ export async function SiteHeader() {
                   <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
                     用户管理
                   </Link>
+                  <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
+                    登录设置
+                  </Link>
                 </>
               ) : null}
               <form action="/api/auth/logout" method="post">

@@ -83,7 +83,7 @@ export default async function HomePage() {
           <ul className="mt-3 space-y-1 text-sm text-[var(--muted)]">
             <li>邮箱 + 密码</li>
             <li>登录账号 + 密码（4–20 位小写字母开头）</li>
-            <li>手机号 + 短信验证码（默认测试码 123456）</li>
+            <li>手机号收验证码登录 / 注册（测试码 123456；配阿里云后发到手机）</li>
             <li>微信公众号 / 扫码 / Android SDK</li>
           </ul>
         </div>

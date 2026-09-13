@@ -24,6 +24,7 @@ import {
   type ApplyableRole,
 } from "@andyyyds/shared/roles";
 import { REFERRAL_STORAGE_KEY } from "@andyyyds/shared/invite";
+import { maskPhone, normalizePhone } from "@andyyyds/shared/phone";
 import { PENDING_REVIEW_MESSAGE } from "@andyyyds/shared/role-applications";
 import { normalizeReferralCode } from "@andyyyds/shared/referral-code";
 import { preferWechatFromClient } from "@andyyyds/shared/auth-channel-preference";
@@ -68,21 +69,22 @@ function safeNextPath(raw: string | null): string | null {
 
 /**
  * 是否把默认 Tab 定在微信。
- * 微信内无公众号配置时授权按钮不可用 → 回退；
- * PC 扫码未就绪仍默认可进微信 Tab（展示现有说明，勿空白）。
+ * 微信内无公众号配置时授权按钮不可用 → 回退到手机号；
+ * 站外浏览器仅在扫码已配置时才默认微信，否则优先手机号验证码。
  */
 function shouldDefaultToWechat(
   inWeChat: boolean,
   methods: Pick<MethodsState, "wechat" | "wechatQr">,
 ): boolean {
   if (inWeChat) return methods.wechat;
-  return true;
+  return methods.wechatQr;
 }
 
-/** 微信不可用时的回退：账号密码（不依赖短信/扫码配置） */
+/** 微信不可用时：有短信就走手机号，否则账号密码 */
 function fallbackChannel(
-  _methods?: Pick<MethodsState, "phone" | "email">,
+  methods?: Pick<MethodsState, "phone" | "email">,
 ): AuthChannel {
+  if (methods?.phone) return "phone";
   return "account";
 }
 
@@ -311,8 +313,8 @@ export function AuthForm({
     setCooldown(Number(data.cooldownSec) || 60);
     setNotice(
       data.testMode
-        ? "测试模式：请查看服务器日志中的验证码，或使用系统设置里的固定测试码"
-        : "验证码已发送，请查收短信",
+        ? `测试模式：验证码已写入服务器日志，或使用固定测试码（默认 123456）。正式环境关闭测试模式后会发到 ${maskPhone(normalizePhone(phone)) || "该手机"}。`
+        : `验证码已发送到 ${maskPhone(normalizePhone(phone)) || "该手机"}，5 分钟内有效`,
     );
   }
 
@@ -655,11 +657,17 @@ export function AuthForm({
 
       {channel === "phone" ? (
         <form onSubmit={onPhoneSubmit} className="space-y-4">
-          {!methods.phone ? (
-            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-sm text-[var(--muted)]">
-              站长尚未启用短信登录。请在「系统设置 → 短信」开启测试模式或配置阿里云短信后重试。
+          {methods.phone ? (
+            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+              {mode === "login"
+                ? "输入手机号收取验证码即可登录。未注册会自动创建账号。"
+                : "输入手机号收取验证码即可注册。该手机号以后也可直接登录。"}
             </p>
-          ) : null}
+          ) : (
+            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-sm text-[var(--muted)]">
+              站长尚未启用短信登录。请在「登录设置」开启手机号验证码，或配置阿里云后关闭测试模式，验证码就会发到手机。
+            </p>
+          )}
           {mode === "register" ? (
             <input
               className="field"
@@ -721,9 +729,13 @@ export function AuthForm({
           ) : null}
           {methods.smsTestMode ? (
             <p className="text-xs text-[var(--muted)]">
-              当前为短信测试模式：验证码见服务器日志，或使用站长设置的固定测试码。
+              当前为测试模式：验证码见服务器日志，或使用站长设置的固定测试码（默认 123456）。配好阿里云并关闭测试模式后，验证码会发到手机。
             </p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-[var(--muted)]">
+              点击「获取验证码」后，请在手机短信里查看 6 位数字。
+            </p>
+          )}
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
           {notice ? (
             <p className="text-sm text-[var(--brand-strong)]">{notice}</p>
