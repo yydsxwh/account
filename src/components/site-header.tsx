@@ -50,6 +50,9 @@ export async function SiteHeader() {
             </>
           ) : (
             <>
+              <Link href="/integrate" className="hidden min-h-10 items-center sm:inline-flex">
+                产品接入
+              </Link>
               <Link href="/login" className="btn btn-secondary min-h-10 px-3">
                 登录
               </Link>

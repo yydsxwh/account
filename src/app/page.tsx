@@ -16,7 +16,7 @@ export default async function HomePage() {
       <header className="space-y-3">
         <h1 className="text-4xl font-semibold">账号中心</h1>
         <p className="max-w-2xl text-[var(--muted)]">
-          一套账号密码，登录你名下的多个软件产品。邮箱、登录名、手机、微信都在这里注册；文档、商城等产品跳过来登录即可。
+          独立账号中心，类似 Google 账号。用户只在这里注册一次；你做的其他软件跳过来登录，共用同一套用户。
         </p>
       </header>
 
@@ -28,6 +28,9 @@ export default async function HomePage() {
             <Link href="/account" className="btn btn-primary min-h-11 px-4">
               进入个人中心
             </Link>
+            <Link href="/integrate" className="btn btn-secondary min-h-11 px-4">
+              其他产品如何接入
+            </Link>
             {isAdmin(session) ? (
               <>
                 <Link href="/studio/users" className="btn btn-secondary min-h-11 px-4">
@@ -35,6 +38,9 @@ export default async function HomePage() {
                 </Link>
                 <Link href="/studio/apps" className="btn btn-secondary min-h-11 px-4">
                   软件产品
+                </Link>
+                <Link href="/studio/settings" className="btn btn-secondary min-h-11 px-4">
+                  登录设置
                 </Link>
               </>
             ) : null}
@@ -47,6 +53,9 @@ export default async function HomePage() {
           </Link>
           <Link href="/register" className="btn btn-secondary min-h-11 px-5">
             注册
+          </Link>
+          <Link href="/integrate" className="btn btn-secondary min-h-11 px-5">
+            其他产品如何接入
           </Link>
         </section>
       )}

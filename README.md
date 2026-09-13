@@ -1,16 +1,19 @@
 # 账号中心
 
-从 [Andyyyds](https://github.com/yydsxwh/Andyyyds) 复制出的账号、密码、登录、注册与用户管理。
+独立的用户账号服务，类似 Google 的 `accounts.google.com`。
+
+- 用户只在这里注册、登录、改资料
+- 站长在这里做用户管理、审核、短信/微信配置
+- 你做的其他软件通过 OAuth 跳过来登录，共用同一套用户，不要再各自存密码
+
+计划上线地址：`https://account.yydsxwh.com`（和 www.yydsxwh.com 分开部署）
 
 ## 功能
 
-- 邮箱 + 密码登录 / 注册
-- 登录账号 + 密码登录 / 注册（与邮箱通道分开）
-- 手机号收验证码登录 / 注册（测试码 `123456`；关闭测试模式并配阿里云后发到手机）
-- 微信：公众号网页授权、开放平台扫码、Android SDK
-- 个人中心：昵称、头像、绑定邮箱 / 账号 / 手机 / 微信、改密码、角色申请
-- 站长后台：用户列表、角色审核、邀请关系、短信与微信配置
-- 多产品单点登录：一套账号进入文档、商城等已登记软件
+- 邮箱 / 登录名 / 手机验证码 / 微信 登录与注册
+- 个人中心：绑定方式、改密码、角色申请
+- 站长：用户管理、软件产品登记、登录设置
+- 多产品单点登录：`/api/oauth/authorize` → `/api/oauth/token` → `/api/oauth/userinfo`
 
 ## 本地运行
 
@@ -24,47 +27,42 @@ npm run dev
 
 打开 http://localhost:3000
 
-## 演示账号
+演示账号密码均为 `123456`：`admin@yyds.local` 等。手机测试码 `123456`。
 
-所有密码均为 `123456`。
+本地看多产品登录：`/demo/docs`、`/demo/shop`。接入说明：`/integrate`。
 
-| 角色 | 登录 |
-|------|------|
-| 站长 | `admin@yyds.local` |
-| 老师 | `teacher@yyds.local` |
-| 加盟代理 | `agent@yyds.local` |
-| 学员 | `student@yyds.local` |
-| 待审商家 | `merchant@yyds.local` |
-| 账号登录 | 用户名 `demo_user` |
+## 独立部署（和主站同一台 nginx）
 
-手机号登录：登录页选「手机号」，点「获取验证码」。本地默认测试模式，验证码固定 `123456`（也写在服务器日志）。要发到用户手机：站长打开「登录设置」，选「发送到用户手机」，填阿里云 AccessKey、短信签名、模板 CODE（模板变量为 `code`），保存后可用「试发验证码」测自己的号码。也可在 `.env` 写 `SMS_ACCESS_KEY_ID` 等，并设 `SMS_TEST_MODE=0`。
+www.yydsxwh.com 已在一台 Ubuntu + nginx 上。账号中心用 Docker 占本机 `3001` 端口，再用子域名反代。
 
-## 多产品共用一套账号
+1. 域名解析里加一条：`account` → 这台服务器 IP（A 记录）。
+2. 在服务器上：
 
-账号中心相当于 Google 的 `accounts.google.com`。每个软件产品不要自己做注册，只要把用户送到这里登录。
-
-1. 站长打开「软件产品」，登记产品名称、首页、回调地址，保存下发的 `client_id` / `client_secret`。
-2. 产品里未登录时跳到：
-
-```
-https://账号中心/api/oauth/authorize?client_id=文档ID&redirect_uri=https://你的产品/auth/callback&state=随机串
+```bash
+git clone https://github.com/yydsxwh/account.git
+cd account
+cp .env.production.example .env.production
+# 改 AUTH_SECRET、BOOTSTRAP_ADMIN_EMAIL、BOOTSTRAP_ADMIN_PASSWORD
+docker compose up -d --build
+sudo cp deploy/nginx-account.yydsxwh.com.conf /etc/nginx/sites-available/account.yydsxwh.com
+sudo ln -s /etc/nginx/sites-available/account.yydsxwh.com /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d account.yydsxwh.com
 ```
 
-3. 用户在账号中心登录（或已经登录则直接回来）。
-4. 产品服务端用回调里的 `code` 换用户：
+3. 浏览器打开 https://account.yydsxwh.com ，用你设的站长邮箱登录。
+4. 「软件产品」里登记其他产品的回调地址。产品按 `/integrate` 接入。
 
-```http
-POST /api/oauth/token
-{
-  "client_id": "docs",
-  "client_secret": "只放在产品服务器",
-  "code": "回调参数",
-  "redirect_uri": "必须和登记的完全一致"
-}
+`COOKIE_DOMAIN=.yydsxwh.com` 让同父域名的产品更容易共用登录态。
+
+首次启动若库是空的，会按 `.env.production` 里的 `BOOTSTRAP_ADMIN_*` 自动建站长。不要对已有数据跑 `npm run db:seed`（会清空用户）。
+
+## 其他产品怎么接
+
+见站内 `/integrate`，或：
+
 ```
-
-返回的 `user.id` 就是全站统一账号。产品库只存这个 id 和本站业务数据，不要再存一份密码。
-
-本地演示：打开 `/demo/docs` 和 `/demo/shop`，用 `admin@yyds.local` / `123456` 登录。退出某个产品后，只要账号中心还在登录，再点「用账号中心登录」不用再输密码。
-
-同父域名（如 `account.yydsxwh.com` 与 `docs.yydsxwh.com`）还可在 `.env` 设 `COOKIE_DOMAIN=.yydsxwh.com`。
+GET  https://account.yydsxwh.com/api/oauth/authorize?client_id=&redirect_uri=&state=
+POST https://account.yydsxwh.com/api/oauth/token
+GET  https://account.yydsxwh.com/api/oauth/userinfo
+```

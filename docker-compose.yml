@@ -1,0 +1,18 @@
+services:
+  account:
+    build: .
+    container_name: yyds-account-center
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: file:/data/prod.db
+    volumes:
+      - account-data:/data
+      - account-uploads:/app/public/uploads
+
+volumes:
+  account-data:
+  account-uploads:
