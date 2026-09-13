@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSession, hashPassword, makeReferralCode } from "@andyyyds/shared/auth";
 import { prisma } from "@andyyyds/shared/db";
+import { allocateKkNumber } from "@andyyyds/shared/kk-allocate";
 import {
   fieldsForSignup,
   PENDING_REVIEW_MESSAGE,
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
         name: body.name,
         email,
         passwordHash: await hashPassword(body.password),
+        kkNumber: await allocateKkNumber(),
         referralCode: makeReferralCode(),
         referredById,
         ...roleFields,
@@ -76,10 +78,16 @@ export async function POST(req: Request) {
         pendingReview: true,
         message: PENDING_REVIEW_MESSAGE,
         requestedRole: applyRole,
+        isNewUser: true,
+        kkNumber: user.kkNumber,
       });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      isNewUser: true,
+      kkNumber: user.kkNumber,
+    });
   } catch {
     return NextResponse.json({ error: "注册失败" }, { status: 400 });
   }

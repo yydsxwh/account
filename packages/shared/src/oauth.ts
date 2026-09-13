@@ -17,6 +17,7 @@ export type PublicAccountUser = {
   name: string;
   email: string;
   username: string;
+  kkNumber: number | null;
   avatarUrl: string;
   role: Role;
   roles: Role[];
@@ -145,6 +146,7 @@ export function toPublicUser(user: {
   name: string;
   email: string;
   username: string | null;
+  kkNumber?: number | null;
   avatarUrl: string;
   role: string;
   roles: string;
@@ -155,6 +157,7 @@ export function toPublicUser(user: {
     name: user.name,
     email: isPlaceholderEmail(user.email) ? "" : user.email,
     username: user.username || "",
+    kkNumber: user.kkNumber ?? null,
     avatarUrl: user.avatarUrl || "",
     role: primaryRole(roles),
     roles,
@@ -219,6 +222,7 @@ export async function exchangeAuthorizationCode(input: {
       name: true,
       email: true,
       username: true,
+      kkNumber: true,
       avatarUrl: true,
       role: true,
       roles: true,
@@ -256,6 +260,7 @@ export async function getUserByAccessToken(token: string) {
       name: true,
       email: true,
       username: true,
+      kkNumber: true,
       avatarUrl: true,
       role: true,
       roles: true,

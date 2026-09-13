@@ -349,16 +349,16 @@ export function AccountAuthPanel({
     <section className="surface rounded-[28px] p-5 sm:p-6">
       <h2 className="text-lg font-semibold">账号安全</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        四种登录方式可绑定到同一账号：登录账号、邮箱、手机号、微信。用任意一种注册后，在此补绑其余方式即可互通。
+        kk 号注册时已自动分配。还可绑定自设账号（类似微信号）、邮箱、手机号、微信，任意一种都能登录同一用户。
       </p>
 
       <div className="mt-4 space-y-3">
         {/* —— 登录账号 —— */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-xs text-[var(--muted)]">登录账号</div>
+            <div className="text-xs text-[var(--muted)]">自设账号（类似微信号）</div>
             <div className="mt-0.5 break-all text-sm font-medium">
-              {hasUsername ? currentUsername : "未绑定"}
+              {hasUsername ? currentUsername : "未设置"}
             </div>
           </div>
           <button
@@ -368,7 +368,7 @@ export function AccountAuthPanel({
               closeOtherForms(showBindUsername ? null : "username")
             }
           >
-            {showBindUsername ? "取消" : hasUsername ? "更换账号" : "绑定账号"}
+            {showBindUsername ? "取消" : hasUsername ? "更换账号" : "设置账号"}
           </button>
         </div>
 
@@ -378,7 +378,7 @@ export function AccountAuthPanel({
             className="space-y-3 rounded-2xl bg-[var(--bg-deep)]/40 p-4"
           >
             <p className="text-xs leading-5 text-[var(--muted)]">
-              4–20 位，小写字母开头，仅含字母、数字、下划线（与邮箱不是同一种登录方式）。
+              类似微信号：4–20 位，小写字母开头，字母和数字可混用（可含下划线）。这和系统自动发的 kk 号不是一回事。
             </p>
             <label className="block text-sm">
               <span className="mb-1.5 block text-[var(--muted)]">登录账号</span>
@@ -390,7 +390,7 @@ export function AccountAuthPanel({
                 value={bindUsername}
                 onChange={(e) => setBindUsername(e.target.value)}
                 required
-                placeholder="例如 xiaoming01"
+                placeholder="例如 yydsboss01"
               />
             </label>
             {hasUsername ? (

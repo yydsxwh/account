@@ -10,6 +10,7 @@ async function main() {
   await prisma.oAuthClient.deleteMany();
   await prisma.smsCode.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.kkSequence.deleteMany();
   await prisma.siteSettings.deleteMany();
 
   const passwordHash = await hashPassword("123456");
@@ -23,6 +24,7 @@ async function main() {
       role: "ADMIN",
       roles: "ADMIN",
       bio: "账号中心站长",
+      kkNumber: 100,
       referralCode: makeReferralCode(),
     },
   });
@@ -36,6 +38,7 @@ async function main() {
       role: "TEACHER",
       roles: "TEACHER",
       bio: "老师演示账号",
+      kkNumber: 101,
       referralCode: makeReferralCode(),
     },
   });
@@ -49,6 +52,7 @@ async function main() {
       role: "AGENT",
       roles: "AGENT",
       bio: "演示加盟代理账号",
+      kkNumber: 102,
       referralCode: makeReferralCode(),
     },
   });
@@ -62,6 +66,7 @@ async function main() {
       role: "STUDENT",
       roles: "STUDENT",
       bio: "热爱学习的新同学",
+      kkNumber: 103,
       referralCode: makeReferralCode(),
       referredById: teacher.id,
     },
@@ -78,6 +83,7 @@ async function main() {
       requestedRole: "MERCHANT",
       roleApplicationStatus: "PENDING",
       bio: "商家入驻待审核演示",
+      kkNumber: 104,
       referralCode: makeReferralCode(),
     },
   });
@@ -92,9 +98,14 @@ async function main() {
       role: "STUDENT",
       roles: "STUDENT",
       bio: "用登录名 demo_user + 密码 123456 登录",
+      kkNumber: 105,
       referralCode: makeReferralCode(),
       referredById: admin.id,
     },
+  });
+
+  await prisma.kkSequence.create({
+    data: { id: "default", next: 106 },
   });
 
   await prisma.siteSettings.create({
@@ -140,7 +151,7 @@ async function main() {
   console.log("Seeded demo accounts. Password for all: 123456");
   console.log("  admin@yyds.local / teacher@yyds.local / agent@yyds.local");
   console.log("  student@yyds.local / merchant@yyds.local");
-  console.log("  username demo_user / 123456");
+  console.log("  username demo_user / 123456  (kk号 100–105)");
   console.log("Demo products: docs / shop  (open /demo/docs and /demo/shop)");
 }
 

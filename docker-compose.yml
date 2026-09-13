@@ -4,7 +4,8 @@ services:
     container_name: yyds-account-center
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      # 3000=www 3001=xiaowenhua 3002=zhouyuding — do not reuse those
+      - "3003:3000"
     env_file:
       - .env.production
     environment:

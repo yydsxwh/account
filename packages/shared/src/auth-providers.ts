@@ -19,6 +19,8 @@ import {
 } from "./auth-email";
 import { validateUsername } from "./auth-username";
 import { prisma } from "./db";
+import { allocateKkNumber } from "./kk-allocate";
+import { parseKkNumber } from "./kk-number";
 import {
   fieldsForSignup,
   PENDING_REVIEW_MESSAGE,
@@ -64,6 +66,7 @@ export type AuthResultPayload = {
   message?: string;
   requestedRole?: string;
   isNewUser?: boolean;
+  kkNumber?: number;
 };
 
 async function sessionPayloadForUser(user: {
@@ -73,6 +76,7 @@ async function sessionPayloadForUser(user: {
   role: string;
   roleApplicationStatus: string;
   requestedRole: string;
+  kkNumber?: number | null;
 }): Promise<AuthResultPayload> {
   await createSession({
     id: user.id,
@@ -80,15 +84,17 @@ async function sessionPayloadForUser(user: {
     name: user.name,
     role: user.role as Role,
   });
+  const kkNumber = user.kkNumber ?? undefined;
   if (isRoleApplicationPending(user.roleApplicationStatus || "")) {
     return {
       ok: true,
       pendingReview: true,
       message: PENDING_REVIEW_MESSAGE,
       requestedRole: user.requestedRole || "",
+      kkNumber,
     };
   }
-  return { ok: true };
+  return { ok: true, kkNumber };
 }
 
 async function resolveReferrerId(referralCode?: string) {
@@ -168,6 +174,7 @@ export async function findOrCreateUserByWechat(input: {
         email: wechatPlaceholderEmail(openid),
         passwordHash: await unusablePasswordHash(),
         passwordSet: false,
+        kkNumber: await allocateKkNumber(),
         // 各渠道 openid 分字段存，避免 JSAPI / 扫码 / App 登录互相覆盖
         ...(channel === "web"
           ? { wechatWebOpenId: openid }
@@ -308,6 +315,7 @@ export async function findOrCreateUserByPhone(input: {
         email: phonePlaceholderEmail(phone),
         passwordHash,
         passwordSet: hasPassword,
+        kkNumber: await allocateKkNumber(),
         referralCode: makeReferralCode(),
         referredById: await resolveReferrerId(input.referralCode),
         ...roleFields,
@@ -431,14 +439,26 @@ export async function bindUsernameToUser(input: {
  * 账号 + 密码注册（与邮箱注册分开：身份靠 username，邮箱为占位）。
  */
 export async function registerUserByUsername(input: {
-  username: string;
+  username?: string;
   password: string;
   name: string;
   referralCode?: string;
   requestedRole?: string;
 }): Promise<{ userId: string; result: AuthResultPayload }> {
-  const checked = validateUsername(input.username);
-  if (!checked.ok) throw new Error(checked.error);
+  const rawUsername = (input.username || "").trim();
+  let username: string | undefined;
+  if (rawUsername) {
+    const checked = validateUsername(rawUsername);
+    if (!checked.ok) throw new Error(checked.error);
+    const exists = await prisma.user.findUnique({
+      where: { username: checked.username },
+      select: { id: true },
+    });
+    if (exists) {
+      throw new Error("该自设账号已被注册，请换一个或直接登录");
+    }
+    username = checked.username;
+  }
 
   const password = (input.password || "").trim();
   if (password.length < 6) {
@@ -447,23 +467,17 @@ export async function registerUserByUsername(input: {
   const name = (input.name || "").trim();
   if (!name) throw new Error("请填写昵称");
 
-  const exists = await prisma.user.findUnique({
-    where: { username: checked.username },
-    select: { id: true },
-  });
-  if (exists) {
-    throw new Error("该登录账号已被注册，请换一个或直接登录");
-  }
-
   const applyRole = resolveApplyRole(input.requestedRole);
   const roleFields = fieldsForSignup(applyRole);
+  const kkNumber = await allocateKkNumber();
   const user = await prisma.user.create({
     data: {
       name,
-      username: checked.username,
-      email: accountPlaceholderEmail(checked.username),
+      username,
+      email: accountPlaceholderEmail(username || `kk${kkNumber}`),
       passwordHash: await hashPassword(password),
       passwordSet: true,
+      kkNumber,
       referralCode: makeReferralCode(),
       referredById: await resolveReferrerId(input.referralCode),
       ...roleFields,
@@ -471,7 +485,7 @@ export async function registerUserByUsername(input: {
   });
 
   const result = await sessionPayloadForUser(user);
-  return { userId: user.id, result };
+  return { userId: user.id, result: { ...result, isNewUser: true } };
 }
 
 /**
@@ -481,23 +495,28 @@ export async function loginUserByUsername(input: {
   username: string;
   password: string;
 }): Promise<{ userId: string; result: AuthResultPayload }> {
-  const checked = validateUsername(input.username);
-  if (!checked.ok) throw new Error(checked.error);
-
+  const raw = (input.username || "").trim();
   const password = (input.password || "").trim();
   if (password.length < 6) {
     throw new Error("密码至少 6 位");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { username: checked.username },
-  });
+  const kkNumber = parseKkNumber(raw);
+  const user = kkNumber
+    ? await prisma.user.findUnique({ where: { kkNumber } })
+    : await (async () => {
+        const checked = validateUsername(raw);
+        if (!checked.ok) throw new Error(checked.error);
+        return prisma.user.findUnique({
+          where: { username: checked.username },
+        });
+      })();
   if (
     !user ||
     !user.passwordSet ||
     !(await verifyPassword(password, user.passwordHash))
   ) {
-    throw new Error("账号或密码错误");
+    throw new Error("kk号 / 账号或密码错误");
   }
 
   const result = await sessionPayloadForUser(user);
