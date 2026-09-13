@@ -44,6 +44,14 @@ export async function PATCH(req: Request) {
     await requireAdmin();
     const body = schema.parse(await req.json());
     const current = await getSiteSettings();
+    const savingSms =
+      body.smsEnabled !== undefined ||
+      body.smsTestMode !== undefined ||
+      body.smsAccessKeyId !== undefined ||
+      body.smsAccessKeySecret !== undefined ||
+      body.smsSignName !== undefined ||
+      body.smsTemplateCode !== undefined ||
+      body.smsTestFixedCode !== undefined;
     const nextTestMode = body.smsTestMode ?? current.smsTestMode;
     const nextKeys = {
       smsEnabled: body.smsEnabled ?? current.smsEnabled,
@@ -58,7 +66,12 @@ export async function PATCH(req: Request) {
         body.smsTestFixedCode?.trim() ?? current.smsTestFixedCode,
     };
     const runtime = resolveSmsRuntime(nextKeys);
-    if (runtime.enabled && !runtime.testMode && !runtime.aliyunReady) {
+    if (
+      savingSms &&
+      runtime.enabled &&
+      !runtime.testMode &&
+      !runtime.aliyunReady
+    ) {
       return NextResponse.json(
         {
           error:
