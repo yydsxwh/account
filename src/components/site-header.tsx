@@ -3,6 +3,7 @@ import { getSession } from "@andyyyds/shared/auth";
 import { isAdmin, roleLabels } from "@andyyyds/shared/roles";
 import { resolveStoredAccessUrl } from "@andyyyds/shared/storage";
 import { UserAvatar } from "@/components/user-avatar";
+import { WwwHomeLink } from "@/components/www-home-link";
 
 export async function SiteHeader() {
   const session = await getSession();
@@ -17,6 +18,7 @@ export async function SiteHeader() {
           账号中心
         </Link>
         <nav className="flex flex-wrap items-center gap-2 text-sm">
+          <WwwHomeLink />
           {session ? (
             <>
               <Link

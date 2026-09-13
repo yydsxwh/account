@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@andyyyds/shared/auth";
 import { listPublicProducts } from "@andyyyds/shared/oauth";
 import { isAdmin } from "@andyyyds/shared/roles";
+import { WwwHomeLink } from "@/components/www-home-link";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,10 @@ export default async function HomePage() {
           <p className="text-sm text-[var(--muted)]">当前已登录</p>
           <p className="mt-1 text-2xl font-semibold">{session.name}</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/account" className="btn btn-primary min-h-11 px-4">
+            <WwwHomeLink className="btn btn-primary min-h-11 px-4">
+              打开网站首页
+            </WwwHomeLink>
+            <Link href="/account" className="btn btn-secondary min-h-11 px-4">
               进入个人中心
             </Link>
             <Link href="/integrate" className="btn btn-secondary min-h-11 px-4">
@@ -48,7 +52,10 @@ export default async function HomePage() {
         </section>
       ) : (
         <section className="flex flex-wrap gap-3">
-          <Link href="/login" className="btn btn-primary min-h-11 px-5">
+          <WwwHomeLink className="btn btn-primary min-h-11 px-5">
+            打开网站首页
+          </WwwHomeLink>
+          <Link href="/login" className="btn btn-secondary min-h-11 px-5">
             登录
           </Link>
           <Link href="/register" className="btn btn-secondary min-h-11 px-5">

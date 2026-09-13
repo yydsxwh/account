@@ -1,5 +1,7 @@
 /** 账号中心与主站、apex 之间允许互相跳回，避免开放重定向。 */
 
+export const WWW_HOME_URL = "https://www.yydsxwh.com";
+
 const FIRST_PARTY_HOSTS = new Set([
   "account.yydsxwh.com",
   "www.yydsxwh.com",
