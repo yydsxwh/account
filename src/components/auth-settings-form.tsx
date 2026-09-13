@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import {
+  postSave,
+  SaveFeedback,
+  type SaveStatus,
+} from "@/components/save-feedback";
 
 type Settings = {
   siteUrl: string;
@@ -22,11 +27,63 @@ type Settings = {
   smsEnvConfigured?: boolean;
 };
 
+type Section = "site" | "sms" | "wechat";
+
+const SMS_KEYS = [
+  "smsEnabled",
+  "smsTestMode",
+  "smsAccessKeyId",
+  "smsAccessKeySecret",
+  "smsSignName",
+  "smsTemplateCode",
+  "smsTestFixedCode",
+] as const;
+
+const SITE_KEYS = ["siteUrl"] as const;
+
+const WECHAT_KEYS = [
+  "wechatAppId",
+  "wechatAppSecret",
+  "wechatWebAppId",
+  "wechatWebAppSecret",
+  "wechatMobileAppId",
+  "wechatMobileAppSecret",
+] as const;
+
+function pick<K extends keyof Settings>(form: Settings, keys: readonly K[]) {
+  const out = {} as Pick<Settings, K>;
+  for (const key of keys) out[key] = form[key];
+  return out;
+}
+
+function SectionSaveBar({
+  saving,
+  status,
+  label,
+}: {
+  saving: boolean;
+  status: SaveStatus;
+  label: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 pt-1">
+      <button type="submit" className="btn btn-primary min-h-11 px-5" disabled={saving}>
+        {saving ? "保存中…" : label}
+      </button>
+      <SaveFeedback status={status} />
+    </div>
+  );
+}
+
+/** Each settings card is its own form with a dedicated save button. Add new cards the same way. */
 export function AuthSettingsForm({ initial }: { initial: Settings }) {
   const [form, setForm] = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState<Section | null>(null);
+  const [status, setStatus] = useState<Record<Section, SaveStatus>>({
+    site: null,
+    sms: null,
+    wechat: null,
+  });
   const [testPhone, setTestPhone] = useState("");
   const [testingSms, setTestingSms] = useState(false);
 
@@ -34,57 +91,66 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const res = await fetch("/api/studio/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = (await res.json()) as { error?: string; settings?: Settings };
-      if (!res.ok) {
-        setError(data.error || "保存失败");
-        return;
-      }
-      if (data.settings) setForm((prev) => ({ ...prev, ...data.settings }));
-      setNotice("已保存");
-    } catch {
-      setError("保存失败");
-    } finally {
-      setSaving(false);
+  async function saveSection(
+    section: Section,
+    payload: Partial<Settings>,
+    okText: string,
+  ) {
+    setSaving(section);
+    setStatus((prev) => ({ ...prev, [section]: null }));
+    const result = await postSave("/api/studio/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSaving(null);
+    if (!result.ok) {
+      setStatus((prev) => ({
+        ...prev,
+        [section]: { kind: "error", text: result.error },
+      }));
+      return;
     }
+    const next = result.data.settings as Settings | undefined;
+    if (next) setForm((prev) => ({ ...prev, ...next }));
+    setStatus((prev) => ({
+      ...prev,
+      [section]: { kind: "ok", text: okText },
+    }));
   }
 
   async function sendTestSms() {
     setTestingSms(true);
-    setError("");
-    setNotice("");
-    try {
-      const res = await fetch("/api/studio/settings/sms-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: testPhone }),
-      });
-      const data = (await res.json()) as { error?: string; message?: string };
-      if (!res.ok) {
-        setError(data.error || "试发失败");
-        return;
-      }
-      setNotice(data.message || "已发送");
-    } catch {
-      setError("试发失败");
-    } finally {
-      setTestingSms(false);
-    }
+    setStatus((prev) => ({ ...prev, sms: null }));
+    const result = await postSave("/api/studio/settings/sms-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: testPhone }),
+    });
+    setTestingSms(false);
+    setStatus((prev) => ({
+      ...prev,
+      sms: result.ok
+        ? {
+            kind: "ok",
+            text:
+              typeof result.data.message === "string"
+                ? result.data.message
+                : "已发送",
+          }
+        : { kind: "error", text: result.error || "试发失败" },
+    }));
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <section className="surface space-y-3 rounded-[28px] p-5">
+    <div className="space-y-6">
+      <form
+        className="surface space-y-3 rounded-[28px] p-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void saveSection("site", pick(form, SITE_KEYS), "站点设置已保存");
+        }}
+      >
         <h2 className="text-lg font-semibold">站点</h2>
         <label className="block text-sm">
           公网地址
@@ -95,9 +161,20 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             placeholder="https://example.com"
           />
         </label>
-      </section>
+        <SectionSaveBar
+          saving={saving === "site"}
+          status={status.site}
+          label="保存站点设置"
+        />
+      </form>
 
-      <section className="surface space-y-3 rounded-[28px] p-5">
+      <form
+        className="surface space-y-3 rounded-[28px] p-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void saveSection("sms", pick(form, SMS_KEYS), "手机号验证码设置已保存");
+        }}
+      >
         <h2 className="text-lg font-semibold">手机号验证码</h2>
         <p className="text-sm text-[var(--muted)]">
           用户填写手机号后收取 6 位验证码，即可注册、登录，或在个人中心绑定到已有账号。关闭测试模式并填好 AccessKey 后，验证码会发到手机。
@@ -105,7 +182,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
         <p className="rounded-2xl bg-[var(--bg-deep)]/50 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
           阿里云国内短信已过审：签名「歪歪滴艾斯杭州科技」，注册登录模板
           SMS_512395568，备用验证码模板 SMS_338610504。下面签名和模板已按过审项填好，一般只需再填
-          AccessKey，关掉测试模式。
+          AccessKey，关掉测试模式，点「保存手机号验证码」。
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -165,7 +242,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
         {!form.smsAliyunReady ? (
           <p className="text-sm text-amber-800">
             还缺阿里云 AccessKey。到 RAM 用户里建一对 AccessKey，把 Id 和
-            Secret 填在下面，保存后再关掉测试模式，验证码才会发到手机。
+            Secret 填在下面，点「保存手机号验证码」。
           </p>
         ) : null}
         <label className="block text-sm">
@@ -175,15 +252,18 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             value={form.smsAccessKeyId}
             onChange={(e) => set("smsAccessKeyId", e.target.value)}
             placeholder="LTAI..."
+            autoComplete="off"
           />
         </label>
         <label className="block text-sm">
           阿里云 AccessKeySecret
           <input
             className="field mt-1"
+            type="password"
             value={form.smsAccessKeySecret}
             onChange={(e) => set("smsAccessKeySecret", e.target.value)}
             placeholder="保存后只显示打码"
+            autoComplete="new-password"
           />
         </label>
         <label className="block text-sm">
@@ -204,10 +284,15 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             placeholder="SMS_512395568"
           />
         </label>
+        <SectionSaveBar
+          saving={saving === "sms"}
+          status={status.sms}
+          label="保存手机号验证码"
+        />
         <div className="rounded-2xl bg-[var(--bg-deep)]/50 p-3">
           <p className="text-sm font-medium">试发到手机</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            保存设置后，用自己的手机号测一次。测试模式不会真发短信。
+            先点上面的「保存手机号验证码」，再用自己的手机号测一次。测试模式不会真发短信。
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <input
@@ -228,9 +313,15 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             </button>
           </div>
         </div>
-      </section>
+      </form>
 
-      <section className="surface space-y-3 rounded-[28px] p-5">
+      <form
+        className="surface space-y-3 rounded-[28px] p-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void saveSection("wechat", pick(form, WECHAT_KEYS), "微信授权设置已保存");
+        }}
+      >
         <h2 className="text-lg font-semibold">微信授权</h2>
         <label className="block text-sm">
           公众号 AppID
@@ -280,13 +371,12 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             onChange={(e) => set("wechatMobileAppSecret", e.target.value)}
           />
         </label>
-      </section>
-
-      {error ? <p className="text-sm text-[var(--fire)]">{error}</p> : null}
-      {notice ? <p className="text-sm text-[var(--brand)]">{notice}</p> : null}
-      <button type="submit" className="btn btn-primary min-h-11 px-5" disabled={saving}>
-        {saving ? "保存中…" : "保存设置"}
-      </button>
-    </form>
+        <SectionSaveBar
+          saving={saving === "wechat"}
+          status={status.wechat}
+          label="保存微信授权"
+        />
+      </form>
+    </div>
   );
 }
