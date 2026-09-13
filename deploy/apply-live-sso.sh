@@ -63,5 +63,14 @@ else
   echo "installed user-sync cron"
 fi
 
+cd "$ACCOUNT_ROOT"
+set -a
+# shellcheck disable=SC1090
+. "$ACC_ENV"
+set +a
+npx prisma generate
+npx prisma db push --schema="$ACCOUNT_ROOT/prisma/schema.prisma"
+USER_SYNC_LOCK=off /usr/bin/node "$ACCOUNT_ROOT/deploy/sync-users-both-ways.mjs"
+/usr/bin/node "$ACCOUNT_ROOT/deploy/backfill-kk-numbers.mjs"
 USER_SYNC_LOCK=off /usr/bin/node "$ACCOUNT_ROOT/deploy/sync-users-both-ways.mjs"
 echo "apply-live-sso done"

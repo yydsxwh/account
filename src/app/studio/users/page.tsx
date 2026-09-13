@@ -11,6 +11,8 @@ function mapUser(u: {
   id: string;
   name: string;
   email: string;
+  username: string | null;
+  kkNumber: number | null;
   role: string;
   roles: string;
   requestedRole: string;
@@ -39,6 +41,8 @@ function mapUser(u: {
     id: u.id,
     name: u.name,
     email: u.email,
+    username: u.username || "",
+    kkNumber: u.kkNumber,
     role: u.role,
     roles,
     rolesLabel: roleLabels(roles),
@@ -78,6 +82,8 @@ export default async function StudioUsersPage() {
     id: true,
     name: true,
     email: true,
+    username: true,
+    kkNumber: true,
     role: true,
     roles: true,
     requestedRole: true,

@@ -10,6 +10,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { hashPassword, makeReferralCode, verifyPassword } from "./password";
+import { allocateKkNumber } from "./kk-allocate";
 import {
   canManageCourses,
   isRoleApplicationPending,
@@ -32,6 +33,7 @@ export type SessionUser = {
   requestedRole: string;
   roleApplicationStatus: string;
   rolePending: boolean;
+  kkNumber: number | null;
 };
 
 function getSecret() {
@@ -89,6 +91,7 @@ const sessionSelect = {
   avatarUrl: true,
   requestedRole: true,
   roleApplicationStatus: true,
+  kkNumber: true,
 } as const;
 
 /**
@@ -131,6 +134,7 @@ async function provisionUserFromJwt(payload: JWTPayload) {
         roles: role,
         passwordHash: await hashPassword(`!sso-pending!${id}`),
         passwordSet: false,
+        kkNumber: await allocateKkNumber(),
         referralCode,
       },
     });
@@ -170,6 +174,7 @@ export async function getSession(): Promise<SessionUser | null> {
       requestedRole: user.requestedRole || "",
       roleApplicationStatus: user.roleApplicationStatus || "NONE",
       rolePending: isRoleApplicationPending(user.roleApplicationStatus || ""),
+      kkNumber: user.kkNumber ?? null,
     };
   } catch {
     return null;

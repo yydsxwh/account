@@ -210,6 +210,7 @@ export function AuthForm({
     pendingReview?: boolean;
     message?: string;
     isNewUser?: boolean;
+    kkNumber?: number;
   }) {
     const search = new URLSearchParams(window.location.search);
     const clientId = (search.get("client_id") || "").trim();
@@ -231,6 +232,27 @@ export function AuthForm({
     }
     // 约搭等流程会带 ?next=，登录后回到原页面继续报名/发起
     const nextPath = safeNextPath(search.get("next"));
+    if (data.isNewUser && data.kkNumber) {
+      try {
+        window.sessionStorage.setItem("kk_welcome", String(data.kkNumber));
+      } catch {
+        /* ignore */
+      }
+      if (nextPath && (nextPath.startsWith("http://") || nextPath.startsWith("https://"))) {
+        try {
+          const dest = new URL(nextPath);
+          dest.searchParams.set("kk", String(data.kkNumber));
+          goAfterAuth(dest.toString());
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
+      if (!data.pendingReview && !nextPath) {
+        goAfterAuth(`/account?kk=${data.kkNumber}`);
+        return;
+      }
+    }
     goAfterAuth(nextPath);
   }
 
@@ -505,8 +527,8 @@ export function AuthForm({
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           {mode === "login"
-            ? "可用微信、账号密码、手机号或邮箱登录。"
-            : "可用微信、账号密码、手机号或邮箱注册。普通用户即用；加盟代理 / 入驻商家 / 老师需站长审核。"}
+            ? "可用微信、kk号 / 自设账号、手机号或邮箱登录。"
+            : "注册后自动获得 kk 号。也可用微信、自设账号、手机号或邮箱。普通用户即用；加盟代理 / 入驻商家 / 老师需站长审核。"}
         </p>
       </div>
 
@@ -541,8 +563,9 @@ export function AuthForm({
       {channel === "account" ? (
         <form onSubmit={onAccountSubmit} className="space-y-4">
           <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-            使用登录账号 + 密码（不是邮箱）。账号为 4–20
-            位，小写字母开头，仅含字母、数字、下划线。
+            {mode === "login"
+              ? "可用系统自动分配的 kk 号（数字，类似 QQ 号），或自己设置的英文数字账号（类似微信号）登录。"
+              : "注册后会自动发一个 kk 号，从 3 位数起，越早注册号码越短。也可另设一串英文+数字账号，类似微信号。"}
           </p>
           {mode === "register" ? (
             <input className="field" name="name" placeholder="昵称" required />
@@ -551,9 +574,13 @@ export function AuthForm({
             className="field"
             name="username"
             autoComplete="username"
-            placeholder="登录账号"
+            placeholder={
+              mode === "login"
+                ? "kk号 或 自设账号"
+                : "自设账号（可选，例如 yydsboss01）"
+            }
             spellCheck={false}
-            required
+            required={mode === "login"}
           />
           <input
             className="field"

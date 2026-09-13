@@ -25,6 +25,7 @@ const ACCOUNT_COLS = [
   "passwordSet",
   "name",
   "username",
+  "kkNumber",
   "bio",
   "avatarUrl",
   "phone",
@@ -99,6 +100,17 @@ function tableCols(db, table) {
   return db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
 }
 
+function ensureKkColumn(db, label) {
+  const cols = tableCols(db, "User");
+  if (!cols.includes("kkNumber")) {
+    if (!DRY_RUN) {
+      db.exec("ALTER TABLE User ADD COLUMN kkNumber INTEGER");
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS User_kkNumber_key ON User(kkNumber)");
+    }
+    console.log(`[sync] added kkNumber column on ${label}`);
+  }
+}
+
 function loadUsers(db) {
   const cols = tableCols(db, "User");
   const rows = db.prepare(`SELECT * FROM User`).all();
@@ -107,6 +119,7 @@ function loadUsers(db) {
     for (const col of ACCOUNT_COLS) {
       if (cols.includes(col)) out[col] = row[col];
       else if (col === "passwordSet") out[col] = 1;
+      else if (col === "kkNumber") out[col] = null;
       else out[col] = col === "referredById" || col === "roleReviewedAt" || col === "roleReviewedById" || col === "username"
         ? null
         : "";
@@ -159,9 +172,16 @@ function mergeRow(source, dest, destUsers, timeStyle) {
   if (!dest || replacing) {
     for (const col of ACCOUNT_COLS) {
       if (col === "id" || col === "email" || col === "passwordHash" || col === "passwordSet") continue;
-      if (col === "createdAt" || col === "updatedAt") continue;
+      if (col === "createdAt" || col === "updatedAt" || col === "kkNumber") continue;
       row[col] = source[col];
     }
+  }
+  if (dest?.kkNumber != null && dest.kkNumber !== "") {
+    row.kkNumber = dest.kkNumber;
+  } else if (source.kkNumber != null && source.kkNumber !== "") {
+    row.kkNumber = source.kkNumber;
+  } else {
+    row.kkNumber = null;
   }
 
   if (shouldCopyPassword(source, dest)) {
@@ -329,6 +349,8 @@ const lockFd = acquireLock();
 const www = open(WWW_DB);
 const acc = open(ACC_DB);
 try {
+  ensureKkColumn(www, "www");
+  ensureKkColumn(acc, "account");
   sync("www", www, "account", acc);
   sync("account", acc, "www", www);
   const copied = copySettings(www, acc);
