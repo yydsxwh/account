@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       passwordSet: bound.passwordSet,
       message: hadUsername
         ? "自设账号已更换"
-        : "自设账号已设置，可用 kk 号或该账号 + 密码登录",
+        : "自设账号已设置，可用「账号」页签 + 密码登录；kk 号请用「kk号」页签",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
