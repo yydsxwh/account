@@ -314,7 +314,10 @@ export function AuthForm({
     const res = await fetch("/api/auth/sms/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, purpose: "login" }),
+      body: JSON.stringify({
+        phone,
+        purpose: mode === "register" ? "register" : "login",
+      }),
     });
     const data = await res.json();
     setLoading(false);

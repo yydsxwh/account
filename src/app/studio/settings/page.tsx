@@ -25,7 +25,8 @@ export default async function StudioSettingsPage() {
       <div>
         <h1 className="text-3xl font-semibold">登录设置</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          每个分区有自己的保存按钮，改完哪一块就存哪一块。密钥保存后只显示打码，留空或保持星号表示不改。
+          每个分区有自己的保存按钮，改完哪一块就存哪一块。手机号验证码可按登录、注册、绑定分别填写模板
+          CODE。密钥保存后只显示打码，留空或保持星号表示不改。
         </p>
       </div>
       <AuthSettingsForm initial={publicSiteSettings(row)} />

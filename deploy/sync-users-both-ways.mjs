@@ -276,6 +276,9 @@ function copySettings(fromDb, toDb) {
     "smsAccessKeySecret",
     "smsSignName",
     "smsTemplateCode",
+    "smsTemplateCodeLogin",
+    "smsTemplateCodeRegister",
+    "smsTemplateCodeBind",
     "smsTestMode",
     "smsTestFixedCode",
   ];
@@ -288,6 +291,65 @@ function copySettings(fromDb, toDb) {
     if (dest[key]) continue;
     if (!DRY_RUN) {
       toDb.prepare(`UPDATE SiteSettings SET ${key}=? WHERE id='default'`).run(value);
+    }
+    copied.push(key);
+  }
+  return copied;
+}
+
+function ensureSmsSceneColumns(db) {
+  const cols = tableCols(db, "SiteSettings");
+  const extras = [
+    "smsTemplateCodeLogin",
+    "smsTemplateCodeRegister",
+    "smsTemplateCodeBind",
+  ];
+  for (const col of extras) {
+    if (!cols.includes(col)) {
+      db.exec(
+        `ALTER TABLE SiteSettings ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`,
+      );
+    }
+  }
+}
+
+/** 账号中心是短信配置源：把开关、签名、分场景模板同步到 www，避免 www 一直停在测试模式。 */
+function syncSmsToWww(fromDb, toDb) {
+  ensureSmsSceneColumns(fromDb);
+  ensureSmsSceneColumns(toDb);
+  const fromCols = tableCols(fromDb, "SiteSettings");
+  const toCols = tableCols(toDb, "SiteSettings");
+  const src = fromDb.prepare("SELECT * FROM SiteSettings WHERE id='default'").get();
+  const dest = toDb.prepare("SELECT * FROM SiteSettings WHERE id='default'").get();
+  if (!src || !dest) return [];
+  const overwrite = [
+    "smsEnabled",
+    "smsProvider",
+    "smsSignName",
+    "smsTemplateCode",
+    "smsTemplateCodeLogin",
+    "smsTemplateCodeRegister",
+    "smsTemplateCodeBind",
+    "smsTestMode",
+    "smsTestFixedCode",
+  ];
+  const copied = [];
+  for (const key of overwrite) {
+    if (!fromCols.includes(key) || !toCols.includes(key)) continue;
+    if (!DRY_RUN) {
+      toDb.prepare(`UPDATE SiteSettings SET ${key}=? WHERE id='default'`).run(
+        src[key],
+      );
+    }
+    copied.push(key);
+  }
+  for (const key of ["smsAccessKeyId", "smsAccessKeySecret"]) {
+    if (!fromCols.includes(key) || !toCols.includes(key)) continue;
+    if (dest[key] || src[key] == null || src[key] === "") continue;
+    if (!DRY_RUN) {
+      toDb.prepare(`UPDATE SiteSettings SET ${key}=? WHERE id='default'`).run(
+        src[key],
+      );
     }
     copied.push(key);
   }
@@ -359,15 +421,17 @@ const acc = open(ACC_DB);
 try {
   ensureKkColumn(www, "www");
   ensureKkColumn(acc, "account");
+  ensureSmsSceneColumns(www);
+  ensureSmsSceneColumns(acc);
   sync("www", www, "account", acc);
   sync("account", acc, "www", www);
   const copiedToAccount = copySettings(www, acc);
   if (copiedToAccount.length) {
     console.log(`[sync] copied empty account settings: ${copiedToAccount.join(",")}`);
   }
-  const copiedToWww = copySettings(acc, www);
+  const copiedToWww = syncSmsToWww(acc, www);
   if (copiedToWww.length) {
-    console.log(`[sync] copied empty www settings: ${copiedToWww.join(",")}`);
+    console.log(`[sync] synced sms settings to www: ${copiedToWww.join(",")}`);
   }
   console.log(
     `[sync] www users=${www.prepare("SELECT count(*) AS n FROM User").get().n} account users=${acc.prepare("SELECT count(*) AS n FROM User").get().n}${DRY_RUN ? " (dry-run)" : ""}`,

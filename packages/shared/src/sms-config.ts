@@ -1,12 +1,19 @@
 /**
  * 短信运行配置：库里的系统设置 + 环境变量。
  * 关测试模式且阿里云参数齐全时，验证码发到用户手机。
+ * 登录 / 注册 / 绑定各自用后台填写的模板 CODE。
  */
 
 import {
+  ALIYUN_SMS_BIND_TEMPLATE,
   ALIYUN_SMS_LOGIN_TEMPLATE,
+  ALIYUN_SMS_REGISTER_TEMPLATE,
   ALIYUN_SMS_SIGN_NAME,
 } from "./sms-templates";
+
+export type SmsPurpose = "login" | "register" | "bind";
+
+export const SMS_PURPOSES: SmsPurpose[] = ["login", "register", "bind"];
 
 export type SmsSettingsInput = {
   smsEnabled: boolean;
@@ -15,6 +22,9 @@ export type SmsSettingsInput = {
   smsAccessKeySecret: string;
   smsSignName: string;
   smsTemplateCode: string;
+  smsTemplateCodeLogin?: string;
+  smsTemplateCodeRegister?: string;
+  smsTemplateCodeBind?: string;
   smsTestFixedCode: string;
 };
 
@@ -27,6 +37,9 @@ export type SmsRuntime = {
   accessKeySecret: string;
   signName: string;
   templateCode: string;
+  templateCodeLogin: string;
+  templateCodeRegister: string;
+  templateCodeBind: string;
   testFixedCode: string;
 };
 
@@ -46,6 +59,30 @@ function envText(name: string) {
   return process.env[name]?.trim() || "";
 }
 
+const APPROVED_TEMPLATE: Record<SmsPurpose, string> = {
+  login: ALIYUN_SMS_LOGIN_TEMPLATE,
+  register: ALIYUN_SMS_REGISTER_TEMPLATE,
+  bind: ALIYUN_SMS_BIND_TEMPLATE,
+};
+
+export function templateCodeFor(
+  settings: SmsSettingsInput,
+  purpose: SmsPurpose,
+): string {
+  const envTemplateCode = envText("SMS_TEMPLATE_CODE");
+  const scene = {
+    login: settings.smsTemplateCodeLogin?.trim() || "",
+    register: settings.smsTemplateCodeRegister?.trim() || "",
+    bind: settings.smsTemplateCodeBind?.trim() || "",
+  }[purpose];
+  return (
+    scene ||
+    settings.smsTemplateCode.trim() ||
+    envTemplateCode ||
+    APPROVED_TEMPLATE[purpose]
+  );
+}
+
 export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
   const envAccessKeyId = envText("SMS_ACCESS_KEY_ID");
   const envAccessKeySecret = envText("SMS_ACCESS_KEY_SECRET");
@@ -57,10 +94,10 @@ export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
     settings.smsAccessKeySecret.trim() || envAccessKeySecret;
   const signName =
     settings.smsSignName.trim() || envSignName || ALIYUN_SMS_SIGN_NAME;
-  const templateCode =
-    settings.smsTemplateCode.trim() ||
-    envTemplateCode ||
-    ALIYUN_SMS_LOGIN_TEMPLATE;
+  const templateCodeLogin = templateCodeFor(settings, "login");
+  const templateCodeRegister = templateCodeFor(settings, "register");
+  const templateCodeBind = templateCodeFor(settings, "bind");
+  const templateCode = templateCodeLogin;
   const aliyunReady = Boolean(
     accessKeyId && accessKeySecret && signName && templateCode,
   );
@@ -68,7 +105,9 @@ export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
     (!settings.smsAccessKeyId.trim() && envAccessKeyId) ||
       (!settings.smsAccessKeySecret.trim() && envAccessKeySecret) ||
       (!settings.smsSignName.trim() && envSignName) ||
-      (!settings.smsTemplateCode.trim() && envTemplateCode),
+      (!settings.smsTemplateCode.trim() &&
+        !settings.smsTemplateCodeLogin?.trim() &&
+        envTemplateCode),
   );
 
   const enabled = envFlag("SMS_ENABLED") ?? settings.smsEnabled;
@@ -86,6 +125,9 @@ export function resolveSmsRuntime(settings: SmsSettingsInput): SmsRuntime {
     accessKeySecret,
     signName,
     templateCode,
+    templateCodeLogin,
+    templateCodeRegister,
+    templateCodeBind,
     testFixedCode:
       settings.smsTestFixedCode.trim() ||
       envText("SMS_TEST_FIXED_CODE") ||

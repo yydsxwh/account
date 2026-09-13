@@ -10,6 +10,7 @@ import { requireAdmin, studioErrorResponse } from "@andyyyds/shared/studio";
 
 const schema = z.object({
   phone: z.string().min(6).max(20),
+  purpose: z.enum(["login", "register", "bind"]).optional().default("login"),
 });
 
 export async function POST(req: Request) {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     const body = schema.parse(await req.json());
     const result = await sendSmsCode({
       phone: body.phone,
-      purpose: "login",
+      purpose: body.purpose,
     });
     return NextResponse.json({
       ok: true,

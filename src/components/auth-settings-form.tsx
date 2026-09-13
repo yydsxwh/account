@@ -21,6 +21,9 @@ type Settings = {
   smsAccessKeySecret: string;
   smsSignName: string;
   smsTemplateCode: string;
+  smsTemplateCodeLogin: string;
+  smsTemplateCodeRegister: string;
+  smsTemplateCodeBind: string;
   smsTestMode: boolean;
   smsTestFixedCode: string;
   smsAliyunReady?: boolean;
@@ -35,7 +38,9 @@ const SMS_KEYS = [
   "smsAccessKeyId",
   "smsAccessKeySecret",
   "smsSignName",
-  "smsTemplateCode",
+  "smsTemplateCodeLogin",
+  "smsTemplateCodeRegister",
+  "smsTemplateCodeBind",
   "smsTestFixedCode",
 ] as const;
 
@@ -85,6 +90,9 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
     wechat: null,
   });
   const [testPhone, setTestPhone] = useState("");
+  const [testPurpose, setTestPurpose] = useState<
+    "login" | "register" | "bind"
+  >("login");
   const [testingSms, setTestingSms] = useState(false);
 
   function set<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -125,7 +133,7 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
     const result = await postSave("/api/studio/settings/sms-test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: testPhone }),
+      body: JSON.stringify({ phone: testPhone, purpose: testPurpose }),
     });
     setTestingSms(false);
     setStatus((prev) => ({
@@ -180,9 +188,9 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
           用户填写手机号后收取 6 位验证码，即可注册、登录，或在个人中心绑定到已有账号。关闭测试模式并填好 AccessKey 后，验证码会发到手机。
         </p>
         <p className="rounded-2xl bg-[var(--bg-deep)]/50 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-          阿里云国内短信已过审：签名「歪歪滴艾斯杭州科技」，注册登录模板
-          SMS_512395568，备用验证码模板 SMS_338610504。下面签名和模板已按过审项填好，一般只需再填
-          AccessKey，关掉测试模式，点「保存手机号验证码」。
+          阿里云国内短信已过审：签名「歪歪滴艾斯杭州科技」。登录 / 注册默认用
+          SMS_512395568（注册登录），绑定手机号默认用 SMS_338610504（验证码短信）。三个场景可以各填各的
+          CODE，改完点「保存手机号验证码」。要发到用户手机，必须关掉测试模式。
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -275,15 +283,40 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
             placeholder="歪歪滴艾斯杭州科技"
           />
         </label>
-        <label className="block text-sm">
-          模板 CODE
-          <input
-            className="field mt-1"
-            value={form.smsTemplateCode}
-            onChange={(e) => set("smsTemplateCode", e.target.value)}
-            placeholder="SMS_512395568"
-          />
-        </label>
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium">各场景模板 CODE</legend>
+          <p className="text-xs leading-5 text-[var(--muted)]">
+            登录、注册、绑定会按这里分别发。CODE 必须和阿里云控制台过审模板一致，模板里要有变量
+            code。
+          </p>
+          <label className="block text-sm">
+            登录
+            <input
+              className="field mt-1"
+              value={form.smsTemplateCodeLogin}
+              onChange={(e) => set("smsTemplateCodeLogin", e.target.value)}
+              placeholder="SMS_512395568"
+            />
+          </label>
+          <label className="block text-sm">
+            注册
+            <input
+              className="field mt-1"
+              value={form.smsTemplateCodeRegister}
+              onChange={(e) => set("smsTemplateCodeRegister", e.target.value)}
+              placeholder="SMS_512395568"
+            />
+          </label>
+          <label className="block text-sm">
+            账号绑定手机号
+            <input
+              className="field mt-1"
+              value={form.smsTemplateCodeBind}
+              onChange={(e) => set("smsTemplateCodeBind", e.target.value)}
+              placeholder="SMS_338610504"
+            />
+          </label>
+        </fieldset>
         <SectionSaveBar
           saving={saving === "sms"}
           status={status.sms}
@@ -292,8 +325,22 @@ export function AuthSettingsForm({ initial }: { initial: Settings }) {
         <div className="rounded-2xl bg-[var(--bg-deep)]/50 p-3">
           <p className="text-sm font-medium">试发到手机</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            先点上面的「保存手机号验证码」，再用自己的手机号测一次。测试模式不会真发短信。
+            先点上面的「保存手机号验证码」，选好场景，再用自己的手机号测一次。测试模式不会真发短信。
           </p>
+          <label className="mt-2 block text-sm">
+            试发场景
+            <select
+              className="field mt-1"
+              value={testPurpose}
+              onChange={(e) =>
+                setTestPurpose(e.target.value as "login" | "register" | "bind")
+              }
+            >
+              <option value="login">登录</option>
+              <option value="register">注册</option>
+              <option value="bind">绑定手机号</option>
+            </select>
+          </label>
           <div className="mt-2 flex flex-wrap gap-2">
             <input
               className="field min-w-0 flex-1"

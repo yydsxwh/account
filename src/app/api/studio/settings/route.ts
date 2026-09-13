@@ -35,6 +35,9 @@ const schema = z.object({
   smsAccessKeySecret: z.string().max(200).optional(),
   smsSignName: z.string().max(40).optional(),
   smsTemplateCode: z.string().max(40).optional(),
+  smsTemplateCodeLogin: z.string().max(40).optional(),
+  smsTemplateCodeRegister: z.string().max(40).optional(),
+  smsTemplateCodeBind: z.string().max(40).optional(),
   smsTestMode: z.boolean().optional(),
   smsTestFixedCode: z.string().max(8).optional(),
 });
@@ -51,8 +54,21 @@ export async function PATCH(req: Request) {
       body.smsAccessKeySecret !== undefined ||
       body.smsSignName !== undefined ||
       body.smsTemplateCode !== undefined ||
+      body.smsTemplateCodeLogin !== undefined ||
+      body.smsTemplateCodeRegister !== undefined ||
+      body.smsTemplateCodeBind !== undefined ||
       body.smsTestFixedCode !== undefined;
     const nextTestMode = body.smsTestMode ?? current.smsTestMode;
+    const nextTemplateLogin =
+      body.smsTemplateCodeLogin?.trim() ?? current.smsTemplateCodeLogin;
+    const nextTemplateRegister =
+      body.smsTemplateCodeRegister?.trim() ?? current.smsTemplateCodeRegister;
+    const nextTemplateBind =
+      body.smsTemplateCodeBind?.trim() ?? current.smsTemplateCodeBind;
+    const nextTemplateFallback =
+      body.smsTemplateCode?.trim() ??
+      nextTemplateLogin ??
+      current.smsTemplateCode;
     const nextKeys = {
       smsEnabled: body.smsEnabled ?? current.smsEnabled,
       smsTestMode: nextTestMode,
@@ -61,7 +77,10 @@ export async function PATCH(req: Request) {
         pickSecretUpdate(body.smsAccessKeySecret, current.smsAccessKeySecret) ??
         current.smsAccessKeySecret,
       smsSignName: body.smsSignName?.trim() ?? current.smsSignName,
-      smsTemplateCode: body.smsTemplateCode?.trim() ?? current.smsTemplateCode,
+      smsTemplateCode: nextTemplateFallback,
+      smsTemplateCodeLogin: nextTemplateLogin,
+      smsTemplateCodeRegister: nextTemplateRegister,
+      smsTemplateCodeBind: nextTemplateBind,
       smsTestFixedCode:
         body.smsTestFixedCode?.trim() ?? current.smsTestFixedCode,
     };
@@ -105,6 +124,9 @@ export async function PATCH(req: Request) {
         smsAccessKeySecret: nextKeys.smsAccessKeySecret,
         smsSignName: nextKeys.smsSignName,
         smsTemplateCode: nextKeys.smsTemplateCode,
+        smsTemplateCodeLogin: nextKeys.smsTemplateCodeLogin,
+        smsTemplateCodeRegister: nextKeys.smsTemplateCodeRegister,
+        smsTemplateCodeBind: nextKeys.smsTemplateCodeBind,
         smsTestMode: nextTestMode,
         smsTestFixedCode: nextKeys.smsTestFixedCode,
       },

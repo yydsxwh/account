@@ -59,12 +59,12 @@ model KkSequence {
   next Int    @default(100)
 }
 
-/// 短信验证码（手机号登录 / 绑定）；哈希存储，短时有效
+/// 短信验证码（手机号登录 / 注册 / 绑定）；哈希存储，短时有效
 model SmsCode {
   id        String    @id @default(cuid())
   phone     String
   codeHash  String
-  /// login | bind
+  /// login | register | bind
   purpose   String    @default("login")
   expiresAt DateTime
   usedAt    DateTime?
@@ -87,14 +87,18 @@ model SiteSettings {
   wechatMobileAppId     String @default("")
   wechatMobileAppSecret String @default("")
 
-  smsEnabled         Boolean @default(true)
-  smsProvider        String  @default("test")
-  smsAccessKeyId     String  @default("")
-  smsAccessKeySecret String  @default("")
-  smsSignName        String  @default("")
-  smsTemplateCode    String  @default("")
-  smsTestMode        Boolean @default(true)
-  smsTestFixedCode   String  @default("123456")
+  smsEnabled              Boolean @default(true)
+  smsProvider             String  @default("test")
+  smsAccessKeyId          String  @default("")
+  smsAccessKeySecret      String  @default("")
+  smsSignName             String  @default("")
+  /// 兼容旧字段：没填分场景 CODE 时当兜底
+  smsTemplateCode         String  @default("")
+  smsTemplateCodeLogin    String  @default("")
+  smsTemplateCodeRegister String  @default("")
+  smsTemplateCodeBind     String  @default("")
+  smsTestMode             Boolean @default(true)
+  smsTestFixedCode        String  @default("123456")
 
   updatedAt DateTime @updatedAt
 }

@@ -196,8 +196,8 @@ export function AccountAuthPanel({
     setCooldown(Number(data.cooldownSec) || 60);
     setNotice(
       data.testMode
-        ? "测试模式：请查看服务器日志中的验证码，或使用固定测试码"
-        : "验证码已发送",
+        ? "当前是测试模式，短信不会发到手机。请站长在登录设置关掉测试模式，或先用固定测试码。"
+        : "验证码已发送到该手机，5 分钟内有效",
     );
   }
 
