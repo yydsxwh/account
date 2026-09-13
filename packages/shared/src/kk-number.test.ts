@@ -3,7 +3,7 @@ import {
   isKkLoginId,
   nextKkNumber,
   parseKkNumber,
-} from "./kk-number.ts";
+} from "./kk-number";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);

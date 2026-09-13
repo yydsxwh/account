@@ -5,6 +5,7 @@ import { RoleApplyPanel } from "@/components/role-apply-panel";
 import { getSession } from "@andyyyds/shared/auth";
 import { isPlaceholderEmail } from "@andyyyds/shared/auth-email";
 import { prisma } from "@andyyyds/shared/db";
+import { safeNextTarget } from "@andyyyds/shared/first-party-url";
 import { inviteRegisterUrl } from "@andyyyds/shared/invite";
 import { listPublicProducts } from "@andyyyds/shared/oauth";
 import { availableAccountApplyRoles } from "@andyyyds/shared/role-applications";
@@ -23,12 +24,13 @@ export const dynamic = "force-dynamic";
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kk?: string; pending?: string }>;
+  searchParams: Promise<{ kk?: string; pending?: string; next?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login?next=/account");
   const params = await searchParams;
   const justAssignedKk = params.kk?.trim() || "";
+  const continueTo = justAssignedKk ? safeNextTarget(params.next) : null;
 
   const [user, products] = await Promise.all([
     prisma.user.findUnique({
@@ -89,11 +91,21 @@ export default async function AccountPage({
       </header>
 
       {justAssignedKk ? (
-        <p className="rounded-[28px] border border-[var(--brand)]/30 bg-[var(--brand)]/8 px-5 py-3 text-sm">
-          注册成功，你的 kk 号是{" "}
-          <span className="font-mono font-semibold">{justAssignedKk}</span>
-          。请记下来，以后可用它登录。
-        </p>
+        <div className="rounded-[28px] border border-[var(--brand)]/30 bg-[var(--brand)]/8 px-5 py-4 text-sm">
+          <p>
+            注册成功，你的 kk 号是{" "}
+            <span className="font-mono font-semibold">{justAssignedKk}</span>
+            。请记下来，以后可用它登录。
+          </p>
+          {continueTo ? (
+            <a
+              href={continueTo}
+              className="btn btn-primary mt-3 inline-flex min-h-10 px-4"
+            >
+              继续
+            </a>
+          ) : null}
+        </div>
       ) : null}
 
       <section className="surface rounded-[28px] p-5 sm:p-6">

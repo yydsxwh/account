@@ -2,7 +2,7 @@ import {
   keepNextHref,
   safeNextTarget,
   wechatReturnPath,
-} from "./first-party-url.ts";
+} from "./first-party-url";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);

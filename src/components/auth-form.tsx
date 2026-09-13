@@ -224,36 +224,23 @@ export function AuthForm({
       window.location.assign(authorize.toString());
       return;
     }
+    const newKk = data.isNewUser && data.kkNumber ? String(data.kkNumber) : "";
     if (data.pendingReview) {
       setNotice(data.message || PENDING_REVIEW_MESSAGE);
-      router.push("/account?pending=1");
+      router.push(newKk ? `/account?pending=1&kk=${newKk}` : "/account?pending=1");
       router.refresh();
       return;
     }
     // 约搭等流程会带 ?next=，登录后回到原页面继续报名/发起
     const nextPath = safeNextPath(search.get("next"));
-    if (data.isNewUser && data.kkNumber) {
-      try {
-        window.sessionStorage.setItem("kk_welcome", String(data.kkNumber));
-      } catch {
-        /* ignore */
-      }
-      if (nextPath && (nextPath.startsWith("http://") || nextPath.startsWith("https://"))) {
-        try {
-          const dest = new URL(nextPath);
-          dest.searchParams.set("kk", String(data.kkNumber));
-          goAfterAuth(dest.toString());
-          return;
-        } catch {
-          /* fall through */
-        }
-      }
-      if (!data.pendingReview && !nextPath) {
-        goAfterAuth(`/account?kk=${data.kkNumber}`);
-        return;
-      }
+    if (!newKk) {
+      goAfterAuth(nextPath);
+      return;
     }
-    goAfterAuth(nextPath);
+    // 新号先回个人中心报出 kk 号，再让用户自己继续，免得没看见号就被带走
+    const welcome = new URLSearchParams({ kk: newKk });
+    if (nextPath) welcome.set("next", nextPath);
+    goAfterAuth(`/account?${welcome.toString()}`);
   }
 
   async function onEmailSubmit(e: React.FormEvent<HTMLFormElement>) {

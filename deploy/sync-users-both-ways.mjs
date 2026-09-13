@@ -128,6 +128,18 @@ function loadUsers(db) {
   });
 }
 
+export function emailKey(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+/** 同一邮箱时保留目标库原有写法，避免把历史行的大小写改掉 */
+export function pickEmail(sourceEmail, destEmail) {
+  const source = String(sourceEmail || "").trim();
+  const dest = String(destEmail || "").trim();
+  if (dest && emailKey(dest) === emailKey(source)) return dest;
+  return source;
+}
+
 function referralFallback(existing) {
   return existing && String(existing).trim()
     ? String(existing)
@@ -138,7 +150,7 @@ function indexUsers(users) {
   const map = new Map();
   for (const user of users) {
     map.set(user.id, user);
-    if (user.email) map.set(`email:${String(user.email).toLowerCase()}`, user);
+    if (user.email) map.set(`email:${emailKey(user.email)}`, user);
     if (user.username) map.set(`username:${String(user.username).toLowerCase()}`, user);
     if (user.referralCode) map.set(`ref:${user.referralCode}`, user);
   }
@@ -158,11 +170,11 @@ function referralTaken(destUsers, code, selfId) {
 }
 
 function mergeRow(source, dest, destUsers, timeStyle) {
-  const email = String(source.email || "").trim().toLowerCase();
   const replacing = shouldReplaceProfile(source, dest);
   const row = dest ? { ...dest } : { ...source };
   row.id = source.id;
-  row.email = email;
+  // 大小写只用来比对；微信/手机占位邮箱里嵌着 openid，原样保留
+  row.email = pickEmail(source.email, dest?.email);
   row.createdAt = formatTime(dest?.createdAt || source.createdAt, timeStyle);
   row.updatedAt = formatTime(
     replacing || !dest ? source.updatedAt : dest.updatedAt,
@@ -213,14 +225,14 @@ function mergeRow(source, dest, destUsers, timeStyle) {
 
 function remember(destUsers, row) {
   destUsers.set(row.id, row);
-  if (row.email) destUsers.set(`email:${String(row.email).toLowerCase()}`, row);
+  if (row.email) destUsers.set(`email:${emailKey(row.email)}`, row);
   if (row.username) destUsers.set(`username:${String(row.username).toLowerCase()}`, row);
   if (row.referralCode) destUsers.set(`ref:${row.referralCode}`, row);
 }
 
 function upsertUser(db, source, destCols, destUsers, timeStyle) {
   const byId = destUsers.get(source.id);
-  const email = String(source.email || "").trim().toLowerCase();
+  const email = emailKey(source.email);
   const byEmail = email ? destUsers.get(`email:${email}`) : null;
   if (byEmail && byEmail.id !== source.id) {
     return { action: "skip-email", email };
@@ -255,13 +267,9 @@ function copySettings(fromDb, toDb) {
   const src = fromDb.prepare("SELECT * FROM SiteSettings WHERE id='default'").get();
   if (!src) return [];
   const copied = [];
+  // 不抄微信 AppID/Secret：公众号网页授权域名只授权了 www，
+  // 账号中心域名没加进去之前，抄过来只会让微信按钮点了报错。
   const keys = [
-    "wechatAppId",
-    "wechatAppSecret",
-    "wechatWebAppId",
-    "wechatWebAppSecret",
-    "wechatMobileAppId",
-    "wechatMobileAppSecret",
     "smsEnabled",
     "smsProvider",
     "smsAccessKeyId",

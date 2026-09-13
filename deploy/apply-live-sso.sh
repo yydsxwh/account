@@ -1,7 +1,8 @@
 #!/bin/bash
 # Run on the live VPS after the account-center files are in /var/www/account.
-# Aligns cookie secret, copies www login/register to the account center,
-# installs the user-sync cron, and syncs User rows. Does not print secrets.
+# Shares the login cookie with www, adds the account-center entry to the www
+# login pages, installs the user-sync cron, and hands out kk numbers.
+# Never prints secrets. Rebuild both apps afterwards.
 set -euo pipefail
 
 ACCOUNT_ROOT="${ACCOUNT_ROOT:-/var/www/account}"
@@ -68,9 +69,12 @@ set -a
 # shellcheck disable=SC1090
 . "$ACC_ENV"
 set +a
+
+# 同步先跑：它会补上 kkNumber 列，之后 prisma db push 就不用 --accept-data-loss
+USER_SYNC_LOCK=off /usr/bin/node "$ACCOUNT_ROOT/deploy/sync-users-both-ways.mjs"
 npx prisma generate
 npx prisma db push --schema="$ACCOUNT_ROOT/prisma/schema.prisma"
-USER_SYNC_LOCK=off /usr/bin/node "$ACCOUNT_ROOT/deploy/sync-users-both-ways.mjs"
 /usr/bin/node "$ACCOUNT_ROOT/deploy/backfill-kk-numbers.mjs"
+# 再同步一次，把刚发的 kk 号写回主站
 USER_SYNC_LOCK=off /usr/bin/node "$ACCOUNT_ROOT/deploy/sync-users-both-ways.mjs"
 echo "apply-live-sso done"
