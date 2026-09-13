@@ -23,9 +23,15 @@ const RPCClient = require("@alicloud/pop-core") as {
 };
 import { hashPassword, verifyPassword } from "./password";
 import { prisma } from "./db";
-import { resolveSmsRuntime } from "./sms-config";
+import {
+  resolveSmsRuntime,
+  templateCodeFor,
+  type SmsPurpose,
+} from "./sms-config";
 import { getSiteSettings, type SiteSettingsRow } from "./site-settings";
 import { isValidCnMobile, normalizePhone } from "./phone";
+
+export type { SmsPurpose };
 
 /** 验证码有效期（分钟） */
 export const SMS_CODE_TTL_MINUTES = 5;
@@ -34,7 +40,6 @@ export const SMS_RESEND_COOLDOWN_SEC = 60;
 /** 同一手机号每日最多发送次数 */
 export const SMS_DAILY_LIMIT = 20;
 
-export type SmsPurpose = "login" | "bind";
 
 export function smsConfigured(settings: SiteSettingsRow) {
   const runtime = resolveSmsRuntime(settings);
@@ -136,6 +141,29 @@ export async function sendSmsCode(input: {
     throw new Error("测试验证码格式无效，请使用 4～8 位数字");
   }
 
+  if (!useTest) {
+    const templateCode = templateCodeFor(settings, purpose);
+    try {
+      await sendAliyunSms({
+        accessKeyId: runtime.accessKeyId,
+        accessKeySecret: runtime.accessKeySecret,
+        signName: runtime.signName,
+        templateCode,
+        phone,
+        code,
+      });
+      console.info(
+        `[sms:aliyun] phone=${phone} purpose=${purpose} template=${templateCode}`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "短信发送失败";
+      console.error(
+        `[sms:aliyun] fail phone=${phone} purpose=${purpose} template=${templateCode} error=${message}`,
+      );
+      throw new Error(message);
+    }
+  }
+
   await prisma.smsCode.create({
     data: {
       phone,
@@ -150,15 +178,6 @@ export async function sendSmsCode(input: {
     console.info(
       `[sms:test] phone=${phone} purpose=${purpose} code=${code} ttl=${SMS_CODE_TTL_MINUTES}m`,
     );
-  } else {
-    await sendAliyunSms({
-      accessKeyId: runtime.accessKeyId,
-      accessKeySecret: runtime.accessKeySecret,
-      signName: runtime.signName,
-      templateCode: runtime.templateCode,
-      phone,
-      code,
-    });
   }
 
   return {

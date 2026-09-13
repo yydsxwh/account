@@ -20,6 +20,9 @@ export type SiteSettingsRow = {
   smsAccessKeySecret: string;
   smsSignName: string;
   smsTemplateCode: string;
+  smsTemplateCodeLogin: string;
+  smsTemplateCodeRegister: string;
+  smsTemplateCodeBind: string;
   smsTestMode: boolean;
   smsTestFixedCode: string;
   updatedAt: Date;
@@ -95,6 +98,12 @@ export function publicSiteSettings(row: SiteSettingsRow) {
       : "",
     smsSignName: row.smsSignName || sms.signName || "",
     smsTemplateCode: row.smsTemplateCode || sms.templateCode || "",
+    smsTemplateCodeLogin:
+      row.smsTemplateCodeLogin || sms.templateCodeLogin || "",
+    smsTemplateCodeRegister:
+      row.smsTemplateCodeRegister || sms.templateCodeRegister || "",
+    smsTemplateCodeBind:
+      row.smsTemplateCodeBind || sms.templateCodeBind || "",
     smsTestMode: sms.testMode,
     smsTestFixedCode: row.smsTestFixedCode || "",
     smsAliyunReady: sms.aliyunReady,

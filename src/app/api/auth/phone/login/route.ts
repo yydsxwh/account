@@ -31,11 +31,11 @@ export async function POST(req: Request) {
     if (!isValidCnMobile(phone)) {
       return NextResponse.json({ error: "请输入正确的手机号" }, { status: 400 });
     }
-    const ok = await verifySmsCode({
-      phone,
-      code: body.code,
-      purpose: "login",
-    });
+    const purpose = body.mode === "register" ? "register" : "login";
+    const ok =
+      (await verifySmsCode({ phone, code: body.code, purpose })) ||
+      (purpose === "register" &&
+        (await verifySmsCode({ phone, code: body.code, purpose: "login" })));
     if (!ok) {
       return NextResponse.json(
         { error: "验证码错误或已过期" },
