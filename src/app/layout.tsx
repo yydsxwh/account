@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { ReferralCapture } from "@/components/referral-capture";
 import { SiteHeader } from "@/components/site-header";
+import { WwwHomeLink } from "@/components/www-home-link";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -30,7 +31,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <footer className="glass-bar border-t py-6 text-sm text-[var(--muted)]">
-            <div className="container">账号中心 · 登录注册与用户管理</div>
+            <div className="container flex flex-wrap items-center justify-between gap-3">
+              <span>账号中心 · 登录注册与用户管理</span>
+              <WwwHomeLink className="text-[var(--brand)] hover:underline">
+                返回网站首页
+              </WwwHomeLink>
+            </div>
           </footer>
         </LocaleProvider>
       </body>

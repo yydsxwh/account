@@ -1,4 +1,5 @@
 import {
+  WWW_HOME_URL,
   keepNextHref,
   safeNextTarget,
   wechatReturnPath,
@@ -28,4 +29,5 @@ assert(
   "wechat wrap",
 );
 assert(wechatReturnPath("/studio") === "/studio", "wechat path");
+assert(WWW_HOME_URL === "https://www.yydsxwh.com", "www home");
 console.log("first-party-url ok");
