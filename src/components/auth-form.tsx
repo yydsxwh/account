@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * 登录 / 注册统一表单：微信 | 账号 | 手机号 | 邮箱。
+ * 登录 / 注册统一表单：微信 | kk号 | 账号 | 手机号 | 邮箱。
  *
  * - 微信内：公众号网页授权（/api/auth/wechat）
  * - 站外浏览器：开放平台网站应用扫码（/api/auth/wechat/qr）
  * - Capacitor Android：开放平台移动应用 SDK（/api/auth/wechat/mobile）
- * - 账号：登录名 + 密码（与邮箱通道分开，不填邮箱）
- * - 手机号：短信验证码；注册可带身份申请与可选密码
+ * - kk号：系统分配的数字号 + 密码（仅登录；注册后自动发号）
+ * - 账号：自设登录名 + 密码（与邮箱、kk 号分开）
+ * - 手机号：登录可用验证码或密码；注册须验证码
  * - 邮箱：真实邮箱 + 密码
  *
  * 国内用户默认落在微信 Tab；微信未配置时回退账号/手机/邮箱，避免空白页。
@@ -38,7 +39,8 @@ import {
   wechatReturnPath,
 } from "@andyyyds/shared/first-party-url";
 
-type AuthChannel = "email" | "account" | "phone" | "wechat";
+type AuthChannel = "email" | "account" | "kk" | "phone" | "wechat";
+type PhoneVia = "code" | "password";
 
 type Props = {
   mode: "login" | "register";
@@ -123,6 +125,7 @@ export function AuthForm({
   const [requestedRole, setRequestedRole] = useState<ApplyableRole>("STUDENT");
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
+  const [phoneVia, setPhoneVia] = useState<PhoneVia>("code");
   const [cooldown, setCooldown] = useState(0);
   const [inWeChat, setInWeChat] = useState(false);
   /** Capacitor Android 壳：优先微信 SDK 快捷登录 */
@@ -269,13 +272,18 @@ export function AuthForm({
     finishAuth(data);
   }
 
-  async function onAccountSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onAccountSubmit(
+    e: React.FormEvent<HTMLFormElement>,
+    kind: "kk" | "username",
+  ) {
     e.preventDefault();
     setLoading(true);
     setError("");
     setNotice("");
     const form = new FormData(e.currentTarget);
-    const username = String(form.get("username") || "");
+    const username = String(
+      form.get(kind === "kk" ? "kk" : "username") || "",
+    );
     const password = String(form.get("password") || "");
     const name = String(form.get("name") || "");
     const referralCode = String(
@@ -288,6 +296,7 @@ export function AuthForm({
       body: JSON.stringify({
         username,
         password,
+        kind,
         mode,
         name: mode === "register" ? name : undefined,
         referralCode: referralCode || undefined,
@@ -345,12 +354,14 @@ export function AuthForm({
       form.get("referralCode") || resolvedRef || "",
     );
 
+    const via = mode === "register" ? "code" : phoneVia;
     const res = await fetch("/api/auth/phone/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         phone,
-        code: smsCode,
+        via,
+        code: via === "code" ? smsCode : undefined,
         mode,
         name: mode === "register" ? name : undefined,
         password: password || undefined,
@@ -490,10 +501,11 @@ export function AuthForm({
   const useMobileQuickLogin =
     inCapacitorAndroid && methods.wechatMobile && Boolean(methods.wechatMobileAppId);
 
-  // Tab 顺序：微信 → 账号 → 手机号 → 邮箱（账号与邮箱分开，电脑端可走账号密码）
+  // 登录：微信 → kk号 → 账号 → 手机号 → 邮箱。注册不单独提供 kk（注册后自动发号）。
   const visibleTabs = (
     [
       { id: "wechat" as const, label: "微信", show: true },
+      { id: "kk" as const, label: "kk号", show: mode === "login" },
       { id: "account" as const, label: "账号", show: true },
       { id: "phone" as const, label: "手机号", show: true },
       { id: "email" as const, label: "邮箱", show: methods.email },
@@ -501,11 +513,13 @@ export function AuthForm({
   ).filter((tab) => tab.show);
 
   const tabGridClass =
-    visibleTabs.length <= 2
-      ? "grid-cols-2"
-      : visibleTabs.length === 3
-        ? "grid-cols-3"
-        : "grid-cols-2 sm:grid-cols-4";
+    visibleTabs.length >= 5
+      ? "grid-cols-3 sm:grid-cols-5"
+      : visibleTabs.length === 4
+        ? "grid-cols-2 sm:grid-cols-4"
+        : visibleTabs.length === 3
+          ? "grid-cols-3"
+          : "grid-cols-2";
 
   const { t } = useLocale();
 
@@ -517,7 +531,7 @@ export function AuthForm({
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           {mode === "login"
-            ? "可用微信、kk号 / 自设账号、手机号或邮箱登录。"
+            ? "可用微信、kk号、自设账号、手机号或邮箱登录。kk号和账号都用密码；手机号可用密码或验证码。"
             : "注册后自动获得 kk 号。也可用微信、自设账号、手机号或邮箱。普通用户即用；加盟代理 / 入驻商家 / 老师需站长审核。"}
         </p>
       </div>
@@ -550,12 +564,55 @@ export function AuthForm({
         ))}
       </div>
 
+      {channel === "kk" && mode === "login" ? (
+        <form
+          onSubmit={(e) => void onAccountSubmit(e, "kk")}
+          className="space-y-4"
+        >
+          <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+            用系统自动分配的 kk 号（纯数字，类似 QQ 号）+ 密码登录。自设账号请切换到「账号」。
+          </p>
+          <input
+            className="field"
+            name="kk"
+            inputMode="numeric"
+            autoComplete="username"
+            placeholder="kk号，例如 100"
+            spellCheck={false}
+            required
+          />
+          <input
+            className="field"
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            placeholder="密码（至少 6 位）"
+            minLength={6}
+            required
+          />
+          {error ? <p className="text-sm text-red-700">{error}</p> : null}
+          {notice ? (
+            <p className="text-sm text-[var(--brand-strong)]">{notice}</p>
+          ) : null}
+          <button
+            className="btn btn-primary w-full"
+            disabled={loading}
+            type="submit"
+          >
+            {loading ? "提交中..." : "kk号登录"}
+          </button>
+        </form>
+      ) : null}
+
       {channel === "account" ? (
-        <form onSubmit={onAccountSubmit} className="space-y-4">
+        <form
+          onSubmit={(e) => void onAccountSubmit(e, "username")}
+          className="space-y-4"
+        >
           <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
             {mode === "login"
-              ? "可用系统自动分配的 kk 号（数字，类似 QQ 号），或自己设置的英文数字账号（类似微信号）登录。"
-              : "注册后会自动发一个 kk 号，从 3 位数起，越早注册号码越短。也可另设一串英文+数字账号，类似微信号。"}
+              ? "用自己设置的英文数字账号（类似微信号）+ 密码登录。数字 kk 号请切换到「kk号」。"
+              : "可另设一串英文+数字账号，类似微信号。注册后还会自动发一个 kk 号。"}
           </p>
           {mode === "register" ? (
             <input className="field" name="name" placeholder="昵称" required />
@@ -566,7 +623,7 @@ export function AuthForm({
             autoComplete="username"
             placeholder={
               mode === "login"
-                ? "kk号 或 自设账号"
+                ? "自设账号，例如 yydsboss01"
                 : "自设账号（可选，例如 yydsboss01）"
             }
             spellCheck={false}
@@ -676,15 +733,48 @@ export function AuthForm({
 
       {channel === "phone" ? (
         <form onSubmit={onPhoneSubmit} className="space-y-4">
-          {methods.phone ? (
+          {mode === "login" ? (
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[var(--bg-deep)]/50 p-1">
+              {(
+                [
+                  { id: "code" as const, label: "验证码登录" },
+                  { id: "password" as const, label: "密码登录" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`min-h-11 rounded-xl px-2 text-sm font-medium transition ${
+                    phoneVia === item.id
+                      ? "bg-white/55 text-[var(--ink)] shadow-[var(--glass-inset)]"
+                      : "text-[var(--muted)]"
+                  }`}
+                  onClick={() => {
+                    setPhoneVia(item.id);
+                    setError("");
+                    setNotice("");
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {mode === "login" && phoneVia === "password" ? (
+            <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+              已绑定手机号并且设置过密码，可直接用手机号 + 密码登录，不用收短信。
+            </p>
+          ) : methods.phone ? (
             <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
               {mode === "login"
-                ? "输入手机号收取验证码即可登录。未注册会自动创建账号。"
-                : "输入手机号收取验证码即可注册。该手机号以后也可直接登录。"}
+                ? "输入手机号收取验证码即可登录。未注册会自动创建账号。设过密码的也可以切到「密码登录」。"
+                : "输入手机号收取验证码即可注册。建议同时设置密码，以后可用手机号 + 密码登录。"}
             </p>
           ) : (
             <p className="rounded-2xl bg-[var(--bg-deep)]/60 px-3 py-2 text-sm text-[var(--muted)]">
-              站长尚未启用短信登录。请在「登录设置」开启手机号验证码，或配置阿里云后关闭测试模式，验证码就会发到手机。
+              {mode === "login" && phoneVia === "password"
+                ? "用已绑定的手机号 + 密码登录。"
+                : "站长尚未启用短信登录。验证码暂不可用；若已设置密码，可切到「密码登录」。"}
             </p>
           )}
           {mode === "register" ? (
@@ -706,25 +796,37 @@ export function AuthForm({
             onChange={(e) => setPhone(e.target.value)}
             required
           />
-          <div className="flex gap-2">
+          {mode === "register" || phoneVia === "code" ? (
+            <div className="flex gap-2">
+              <input
+                className="field min-w-0 flex-1"
+                inputMode="numeric"
+                name="code"
+                placeholder="短信验证码"
+                value={smsCode}
+                onChange={(e) => setSmsCode(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-secondary shrink-0 min-h-11 px-3 text-sm"
+                disabled={loading || cooldown > 0 || !methods.phone}
+                onClick={sendCode}
+              >
+                {cooldown > 0 ? `${cooldown}s` : "获取验证码"}
+              </button>
+            </div>
+          ) : (
             <input
-              className="field min-w-0 flex-1"
-              inputMode="numeric"
-              name="code"
-              placeholder="短信验证码"
-              value={smsCode}
-              onChange={(e) => setSmsCode(e.target.value)}
+              className="field"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder="密码（至少 6 位）"
+              minLength={6}
               required
             />
-            <button
-              type="button"
-              className="btn btn-secondary shrink-0 min-h-11 px-3 text-sm"
-              disabled={loading || cooldown > 0 || !methods.phone}
-              onClick={sendCode}
-            >
-              {cooldown > 0 ? `${cooldown}s` : "获取验证码"}
-            </button>
-          </div>
+          )}
           {mode === "register" ? (
             <>
               <input
@@ -746,29 +848,36 @@ export function AuthForm({
               />
             </>
           ) : null}
-          {methods.smsTestMode ? (
-            <p className="text-xs text-[var(--muted)]">
-              当前为测试模式：验证码见服务器日志，或使用站长设置的固定测试码（默认 123456）。配好阿里云并关闭测试模式后，验证码会发到手机。
-            </p>
-          ) : (
-            <p className="text-xs text-[var(--muted)]">
-              点击「获取验证码」后，请在手机短信里查看 6 位数字。
-            </p>
-          )}
+          {mode === "register" || phoneVia === "code" ? (
+            methods.smsTestMode ? (
+              <p className="text-xs text-[var(--muted)]">
+                当前为测试模式：验证码见服务器日志，或使用站长设置的固定测试码（默认 123456）。配好阿里云并关闭测试模式后，验证码会发到手机。
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--muted)]">
+                点击「获取验证码」后，请在手机短信里查看 6 位数字。
+              </p>
+            )
+          ) : null}
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
           {notice ? (
             <p className="text-sm text-[var(--brand-strong)]">{notice}</p>
           ) : null}
           <button
             className="btn btn-primary w-full"
-            disabled={loading || !methods.phone}
+            disabled={
+              loading ||
+              ((mode === "register" || phoneVia === "code") && !methods.phone)
+            }
             type="submit"
           >
             {loading
               ? "提交中..."
-              : mode === "login"
-                ? "手机号登录"
-                : "手机号注册"}
+              : mode === "register"
+                ? "手机号注册"
+                : phoneVia === "password"
+                  ? "密码登录"
+                  : "验证码登录"}
           </button>
         </form>
       ) : null}

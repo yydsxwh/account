@@ -91,8 +91,9 @@ export default async function HomePage() {
           <h2 className="text-lg font-semibold">登录方式</h2>
           <ul className="mt-3 space-y-1 text-sm text-[var(--muted)]">
             <li>邮箱 + 密码</li>
-            <li>kk号（自动分配的数字号）或自设账号 + 密码</li>
-            <li>手机号收验证码登录 / 注册</li>
+            <li>kk号 + 密码</li>
+            <li>自设账号 + 密码</li>
+            <li>手机号 + 密码，或收验证码登录 / 注册</li>
             <li>微信公众号 / 扫码 / Android SDK</li>
           </ul>
         </div>

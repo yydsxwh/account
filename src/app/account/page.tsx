@@ -114,7 +114,7 @@ export default async function AccountPage({
           {user?.kkNumber ?? session.kkNumber ?? "—"}
         </p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          类似 QQ 号，注册时自动分配，越早越短。登录时可填 kk 号 + 密码。
+          类似 QQ 号，注册时自动分配，越早越短。登录时请用「kk号」页签 + 密码。
         </p>
         <p className="mt-3 text-sm">
           自设账号：

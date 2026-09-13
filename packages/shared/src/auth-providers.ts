@@ -20,7 +20,8 @@ import {
 import { validateUsername } from "./auth-username";
 import { prisma } from "./db";
 import { allocateKkNumber } from "./kk-allocate";
-import { parseKkNumber } from "./kk-number";
+import { parsePasswordLoginId } from "./password-login-id";
+import { isValidCnMobile, normalizePhone } from "./phone";
 import {
   fieldsForSignup,
   PENDING_REVIEW_MESSAGE,
@@ -489,36 +490,64 @@ export async function registerUserByUsername(input: {
 }
 
 /**
- * 账号 + 密码登录（只查 username，不走邮箱字段）。
+ * 账号或 kk 号 + 密码登录（不走邮箱字段）。
+ * kind=kk / username 时只认对应一种，避免两个入口混用。
  */
 export async function loginUserByUsername(input: {
   username: string;
   password: string;
+  kind?: "kk" | "username" | "any";
 }): Promise<{ userId: string; result: AuthResultPayload }> {
-  const raw = (input.username || "").trim();
   const password = (input.password || "").trim();
   if (password.length < 6) {
     throw new Error("密码至少 6 位");
   }
+  const parsed = parsePasswordLoginId(input.username, input.kind || "any");
+  if (!parsed.ok) throw new Error(parsed.error);
 
-  const kkNumber = parseKkNumber(raw);
-  const user = kkNumber
-    ? await prisma.user.findUnique({ where: { kkNumber } })
-    : await (async () => {
-        const checked = validateUsername(raw);
-        if (!checked.ok) throw new Error(checked.error);
-        return prisma.user.findUnique({
-          where: { username: checked.username },
+  const user =
+    parsed.via === "kk"
+      ? await prisma.user.findUnique({ where: { kkNumber: parsed.kkNumber } })
+      : await prisma.user.findUnique({
+          where: { username: parsed.username },
         });
-      })();
+  const mismatch =
+    parsed.via === "kk" ? "kk号或密码错误" : "账号或密码错误";
   if (
     !user ||
     !user.passwordSet ||
     !(await verifyPassword(password, user.passwordHash))
   ) {
-    throw new Error("kk号 / 账号或密码错误");
+    throw new Error(mismatch);
   }
 
+  const result = await sessionPayloadForUser(user);
+  return { userId: user.id, result };
+}
+
+/** 已绑定手机号且设置过密码：手机号 + 密码登录（不发短信） */
+export async function loginUserByPhonePassword(input: {
+  phone: string;
+  password: string;
+}): Promise<{ userId: string; result: AuthResultPayload }> {
+  const phone = normalizePhone(input.phone);
+  if (!isValidCnMobile(phone)) {
+    throw new Error("请输入正确的手机号");
+  }
+  const password = (input.password || "").trim();
+  if (password.length < 6) {
+    throw new Error("密码至少 6 位");
+  }
+  const user = await prisma.user.findFirst({ where: { phone } });
+  if (!user) {
+    throw new Error("手机号或密码错误");
+  }
+  if (!user.passwordSet) {
+    throw new Error("该手机号尚未设置密码，请用验证码登录，或先在个人中心设置密码");
+  }
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    throw new Error("手机号或密码错误");
+  }
   const result = await sessionPayloadForUser(user);
   return { userId: user.id, result };
 }

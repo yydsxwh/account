@@ -251,7 +251,7 @@ export function AccountAuthPanel({
     setCurrentPhone(normalizePhone(bindPhone));
     setShowBindPhone(false);
     setCode("");
-    setNotice("手机号绑定成功，可用验证码登录同一账号");
+    setNotice("手机号绑定成功，可用验证码或密码登录同一账号");
   }
 
   async function onBindEmail(e: React.FormEvent) {
