@@ -46,6 +46,9 @@ export function buildUserClaims(input: {
     claims.picture = input.avatarUrl ?? user.avatarUrl ?? "";
     claims.locale = user.locale || "zh-Hans";
     claims.zoneinfo = user.timezone || "Asia/Shanghai";
+    // KK 号是公开身份号（类似 QQ 号），不是凭据；放进 profile
+    // 让主站等第一方产品不必额外申请 account.basic 也能展示/回写投影。
+    claims.kk_number = user.kkNumber ?? null;
     if (user.updatedAt) {
       claims.updated_at = Math.floor(user.updatedAt.getTime() / 1000);
     }
