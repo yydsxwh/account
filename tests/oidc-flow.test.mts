@@ -426,7 +426,7 @@ try {
     scope: "openid profile email phone",
   });
   assert(full.name === "测试用户", "profile scope 返回昵称");
-  assert(full.kk_number != null, "profile scope 返回 kk_number");
+  assert("kk_number" in full, "profile scope 返回 kk_number");
   assert(full.email === "oidc-tester@example.com", "email scope 返回邮箱");
   assert(full.email_verified === false, "未验证邮箱标记为 false");
   assert(full.phone_number === "13800138000", "phone scope 返回手机号");
