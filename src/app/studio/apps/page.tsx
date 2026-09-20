@@ -26,12 +26,14 @@ export default async function StudioAppsPage() {
         <h1 className="text-3xl font-semibold">软件产品</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           像 Google 账号那样：用户只在这里注册一次，你的文档、商城、论坛各自跳过来登录。
+          密钥只在登记或点「重新生成密钥」时显示一次，列表里永远看不到。
         </p>
       </div>
       <ProductAppsPanel
         initialApps={rows.map((row) => ({
           id: row.id,
           clientId: row.clientId,
+          clientType: row.clientType,
           name: row.name,
           homepageUrl: row.homepageUrl,
           redirectUris: parseUriList(row.redirectUris),

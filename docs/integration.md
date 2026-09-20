@@ -36,7 +36,9 @@ Auth.js / NextAuth 的 generic OIDC provider、`openid-client`、
 | 回调地址 | 完整 https 地址，精确匹配，可以填多个 |
 | allowedScopes | 一般 `openid profile email`；要长期登录再加 `offline_access` |
 
-保存后会显示一次 `client_secret`，**只显示这一次**。
+保存后页面顶部会显示一次 `client_secret`，**只显示这一次**。
+库里只存哈希，产品列表永远看不到明文。刷新、关掉页面、或登记时提示「产品 ID 已被占用」，都不会再看到密钥。
+已经登记过的产品，在卡片上点「重新生成密钥」会再显示一次新明文，旧密钥立刻失效。
 public 客户端不发密钥。
 
 回调地址的规则（登记时就会被校验）：

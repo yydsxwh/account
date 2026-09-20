@@ -5,6 +5,7 @@ import { useState } from "react";
 export type ProductApp = {
   id: string;
   clientId: string;
+  clientType?: string;
   name: string;
   homepageUrl: string;
   redirectUris: string[];
@@ -18,9 +19,21 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
   const [redirectUris, setRedirectUris] = useState("");
   const [clientId, setClientId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rotatingId, setRotatingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [newSecret, setNewSecret] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function copySecret() {
+    if (!newSecret) return;
+    try {
+      await navigator.clipboard.writeText(newSecret);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   async function createApp(e: React.FormEvent) {
     e.preventDefault();
@@ -28,6 +41,7 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
     setError("");
     setNotice("");
     setNewSecret("");
+    setCopied(false);
     try {
       const res = await fetch("/api/studio/apps", {
         method: "POST",
@@ -82,8 +96,50 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
     }
   }
 
+  async function rotateSecret(app: ProductApp) {
+    if (!window.confirm(`重新生成 ${app.clientId} 的密钥？旧密钥立刻失效。`)) return;
+    setError("");
+    setNotice("");
+    setNewSecret("");
+    setCopied(false);
+    setRotatingId(app.id);
+    try {
+      const res = await fetch("/api/studio/apps", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: app.id, rotateSecret: true }),
+      });
+      const data = (await res.json()) as {
+        app?: ProductApp;
+        clientSecret?: string;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error || "生成密钥失败");
+        return;
+      }
+      setNewSecret(data.clientSecret || "");
+      setNotice(data.message || "新密钥已生成，请立刻保存");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      setError("生成密钥失败");
+    } finally {
+      setRotatingId("");
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {newSecret ? (
+        <div className="space-y-3 rounded-[28px] border border-[var(--brand)] bg-[var(--brand-soft)] p-5 text-sm">
+          <p className="font-semibold">client_secret（只显示这一次，刷新或离开本页就没了）</p>
+          <p className="break-all font-mono text-base">{newSecret}</p>
+          <button type="button" className="btn btn-primary min-h-11 px-4" onClick={() => void copySecret()}>
+            {copied ? "已复制" : "复制密钥"}
+          </button>
+        </div>
+      ) : null}
       <form onSubmit={createApp} className="surface space-y-3 rounded-[28px] p-5">
         <h2 className="text-lg font-semibold">接入新产品</h2>
         <p className="text-sm text-[var(--muted)]">
@@ -129,11 +185,6 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
         </label>
         {error ? <p className="text-sm text-[var(--fire)]">{error}</p> : null}
         {notice ? <p className="text-sm text-[var(--brand)]">{notice}</p> : null}
-        {newSecret ? (
-          <p className="break-all rounded-2xl bg-[var(--brand-soft)] p-3 text-sm">
-            client_secret：<code>{newSecret}</code>
-          </p>
-        ) : null}
         <button type="submit" className="btn btn-primary min-h-11 px-4" disabled={saving}>
           {saving ? "创建中…" : "登记产品"}
         </button>
@@ -151,14 +202,29 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
                   <p className="mt-1 font-mono text-sm text-[var(--muted)]">
                     client_id = {app.clientId}
                   </p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    密钥只存哈希，列表里永远看不到明文。
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary min-h-10 px-3"
-                  onClick={() => toggle(app)}
-                >
-                  {app.enabled ? "停用" : "启用"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {app.clientType === "public" ? null : (
+                    <button
+                      type="button"
+                      className="btn btn-secondary min-h-10 px-3"
+                      disabled={rotatingId === app.id}
+                      onClick={() => void rotateSecret(app)}
+                    >
+                      {rotatingId === app.id ? "生成中…" : "重新生成密钥"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary min-h-10 px-3"
+                    onClick={() => toggle(app)}
+                  >
+                    {app.enabled ? "停用" : "启用"}
+                  </button>
+                </div>
               </div>
               {app.homepageUrl ? (
                 <p className="mt-2 break-all text-sm">{app.homepageUrl}</p>
