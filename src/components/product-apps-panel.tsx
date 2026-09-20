@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { oneTimeClientSecret } from "@/lib/one-time-client-secret";
+import { OneTimeSecretPanel, type RevealedSecret } from "./one-time-secret-panel";
 
 export type ProductApp = {
   id: string;
@@ -22,17 +24,16 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
   const [rotatingId, setRotatingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [newSecret, setNewSecret] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
 
-  async function copySecret() {
-    if (!newSecret) return;
-    try {
-      await navigator.clipboard.writeText(newSecret);
-      setCopied(true);
-    } catch {
-      setCopied(false);
+  function revealSecret(app: ProductApp | undefined, secret: string | undefined) {
+    const plaintext = oneTimeClientSecret(app?.clientType, secret);
+    if (!plaintext || !app?.clientId) {
+      setRevealed(null);
+      return;
     }
+    setRevealed({ clientId: app.clientId, clientSecret: plaintext });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function createApp(e: React.FormEvent) {
@@ -40,8 +41,7 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
     setSaving(true);
     setError("");
     setNotice("");
-    setNewSecret("");
-    setCopied(false);
+    setRevealed(null);
     try {
       const res = await fetch("/api/studio/apps", {
         method: "POST",
@@ -67,7 +67,7 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
         return;
       }
       if (data.app) setApps((prev) => [...prev, data.app!]);
-      setNewSecret(data.clientSecret || "");
+      revealSecret(data.app, data.clientSecret);
       setNotice(data.message || "已创建");
       setName("");
       setHomepageUrl("");
@@ -100,8 +100,7 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
     if (!window.confirm(`重新生成 ${app.clientId} 的密钥？旧密钥立刻失效。`)) return;
     setError("");
     setNotice("");
-    setNewSecret("");
-    setCopied(false);
+    setRevealed(null);
     setRotatingId(app.id);
     try {
       const res = await fetch("/api/studio/apps", {
@@ -119,9 +118,8 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
         setError(data.error || "生成密钥失败");
         return;
       }
-      setNewSecret(data.clientSecret || "");
+      revealSecret(data.app || app, data.clientSecret);
       setNotice(data.message || "新密钥已生成，请立刻保存");
-      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setError("生成密钥失败");
     } finally {
@@ -131,19 +129,14 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
 
   return (
     <div className="space-y-6">
-      {newSecret ? (
-        <div className="space-y-3 rounded-[28px] border border-[var(--brand)] bg-[var(--brand-soft)] p-5 text-sm">
-          <p className="font-semibold">client_secret（只显示这一次，刷新或离开本页就没了）</p>
-          <p className="break-all font-mono text-base">{newSecret}</p>
-          <button type="button" className="btn btn-primary min-h-11 px-4" onClick={() => void copySecret()}>
-            {copied ? "已复制" : "复制密钥"}
-          </button>
-        </div>
+      {revealed ? (
+        <OneTimeSecretPanel revealed={revealed} onDismiss={() => setRevealed(null)} />
       ) : null}
       <form onSubmit={createApp} className="surface space-y-3 rounded-[28px] p-5">
         <h2 className="text-lg font-semibold">接入新产品</h2>
         <p className="text-sm text-[var(--muted)]">
-          登记后，该软件登录时跳到账号中心，用户用同一套账号密码进入。
+          登记后，该软件登录时跳到账号中心，用户用同一套账号密码进入。confidential
+          产品创建成功会立刻弹出本次密钥，只显示这一次。
         </p>
         <label className="block text-sm">
           产品名称

@@ -13,6 +13,7 @@ import { CLIENT_TYPES, GRANT_TYPES } from "@andyyyds/shared/oidc/clients";
 import { KNOWN_SCOPES, formatScope, parseScope } from "@andyyyds/shared/oidc/scopes";
 import { recordSecurityEvent } from "@andyyyds/shared/security/events";
 import { requireAdmin, studioErrorResponse } from "@andyyyds/shared/studio";
+import { oneTimeClientSecret } from "@/lib/one-time-client-secret";
 
 function serializeApp(row: {
   id: string;
@@ -130,8 +131,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({
       app: serializeApp(row),
-      clientSecret:
-        body.clientType === "public" ? undefined : plaintextSecret,
+      clientSecret: oneTimeClientSecret(body.clientType, plaintextSecret),
       message:
         body.clientType === "public"
           ? "公开客户端不使用密钥，请在产品里配置 PKCE"
@@ -209,7 +209,7 @@ export async function PATCH(req: Request) {
     }
     return NextResponse.json({
       app: serializeApp(row),
-      clientSecret: plaintextSecret,
+      clientSecret: oneTimeClientSecret(row.clientType, plaintextSecret),
       message: plaintextSecret
         ? "新密钥已生成，请立刻保存"
         : "已保存",
