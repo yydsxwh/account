@@ -19,6 +19,10 @@ import {
 } from "./auth-email";
 import { validateUsername } from "./auth-username";
 import { prisma } from "./db";
+import { allocateKkNumber } from "./kk-allocate";
+import { parsePasswordLoginId } from "./password-login-id";
+import { isValidCnMobile, normalizePhone } from "./phone";
+import type { SessionContext } from "./security/sessions";
 import {
   fieldsForSignup,
   PENDING_REVIEW_MESSAGE,
@@ -64,31 +68,41 @@ export type AuthResultPayload = {
   message?: string;
   requestedRole?: string;
   isNewUser?: boolean;
+  kkNumber?: number;
 };
 
-async function sessionPayloadForUser(user: {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  roleApplicationStatus: string;
-  requestedRole: string;
-}): Promise<AuthResultPayload> {
-  await createSession({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role as Role,
-  });
+async function sessionPayloadForUser(
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    roleApplicationStatus: string;
+    requestedRole: string;
+    kkNumber?: number | null;
+  },
+  context?: SessionContext,
+): Promise<AuthResultPayload> {
+  await createSession(
+    {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as Role,
+    },
+    { context },
+  );
+  const kkNumber = user.kkNumber ?? undefined;
   if (isRoleApplicationPending(user.roleApplicationStatus || "")) {
     return {
       ok: true,
       pendingReview: true,
       message: PENDING_REVIEW_MESSAGE,
       requestedRole: user.requestedRole || "",
+      kkNumber,
     };
   }
-  return { ok: true };
+  return { ok: true, kkNumber };
 }
 
 async function resolveReferrerId(referralCode?: string) {
@@ -136,6 +150,7 @@ export async function findUserByWechatIdentity(input: {
  * 微信内 JSAPI 支付会用错 openid 失败。
  */
 export async function findOrCreateUserByWechat(input: {
+  context?: SessionContext;
   openid: string;
   unionid?: string;
   channel?: WechatIdentityChannel;
@@ -168,6 +183,7 @@ export async function findOrCreateUserByWechat(input: {
         email: wechatPlaceholderEmail(openid),
         passwordHash: await unusablePasswordHash(),
         passwordSet: false,
+        kkNumber: await allocateKkNumber(),
         // 各渠道 openid 分字段存，避免 JSAPI / 扫码 / App 登录互相覆盖
         ...(channel === "web"
           ? { wechatWebOpenId: openid }
@@ -205,7 +221,10 @@ export async function findOrCreateUserByWechat(input: {
     }
   }
 
-  const result = await sessionPayloadForUser(user);
+  const result = await sessionPayloadForUser(user, {
+    method: "wechat",
+    ...(input.context || {}),
+  });
   return { userId: user.id, isNewUser, result: { ...result, isNewUser } };
 }
 
@@ -276,6 +295,7 @@ export async function findOrCreateUserByPhone(input: {
   /** 可选：手机号注册时同时设密码，便于以后邮箱旁路登录 */
   password?: string;
   mode?: "login" | "register";
+  context?: SessionContext;
 }): Promise<{ userId: string; isNewUser: boolean; result: AuthResultPayload }> {
   const phone = input.phone;
   const mode = input.mode || "login";
@@ -308,6 +328,7 @@ export async function findOrCreateUserByPhone(input: {
         email: phonePlaceholderEmail(phone),
         passwordHash,
         passwordSet: hasPassword,
+        kkNumber: await allocateKkNumber(),
         referralCode: makeReferralCode(),
         referredById: await resolveReferrerId(input.referralCode),
         ...roleFields,
@@ -315,7 +336,10 @@ export async function findOrCreateUserByPhone(input: {
     });
   }
 
-  const result = await sessionPayloadForUser(user);
+  const result = await sessionPayloadForUser(user, {
+    method: "sms",
+    ...(input.context || {}),
+  });
   return { userId: user.id, isNewUser, result: { ...result, isNewUser } };
 }
 
@@ -431,14 +455,27 @@ export async function bindUsernameToUser(input: {
  * 账号 + 密码注册（与邮箱注册分开：身份靠 username，邮箱为占位）。
  */
 export async function registerUserByUsername(input: {
-  username: string;
+  username?: string;
   password: string;
   name: string;
   referralCode?: string;
   requestedRole?: string;
+  context?: SessionContext;
 }): Promise<{ userId: string; result: AuthResultPayload }> {
-  const checked = validateUsername(input.username);
-  if (!checked.ok) throw new Error(checked.error);
+  const rawUsername = (input.username || "").trim();
+  let username: string | undefined;
+  if (rawUsername) {
+    const checked = validateUsername(rawUsername);
+    if (!checked.ok) throw new Error(checked.error);
+    const exists = await prisma.user.findUnique({
+      where: { username: checked.username },
+      select: { id: true },
+    });
+    if (exists) {
+      throw new Error("该自设账号已被注册，请换一个或直接登录");
+    }
+    username = checked.username;
+  }
 
   const password = (input.password || "").trim();
   if (password.length < 6) {
@@ -447,59 +484,88 @@ export async function registerUserByUsername(input: {
   const name = (input.name || "").trim();
   if (!name) throw new Error("请填写昵称");
 
-  const exists = await prisma.user.findUnique({
-    where: { username: checked.username },
-    select: { id: true },
-  });
-  if (exists) {
-    throw new Error("该登录账号已被注册，请换一个或直接登录");
-  }
-
   const applyRole = resolveApplyRole(input.requestedRole);
   const roleFields = fieldsForSignup(applyRole);
+  const kkNumber = await allocateKkNumber();
   const user = await prisma.user.create({
     data: {
       name,
-      username: checked.username,
-      email: accountPlaceholderEmail(checked.username),
+      username,
+      email: accountPlaceholderEmail(username || `kk${kkNumber}`),
       passwordHash: await hashPassword(password),
       passwordSet: true,
+      kkNumber,
       referralCode: makeReferralCode(),
       referredById: await resolveReferrerId(input.referralCode),
       ...roleFields,
     },
   });
 
-  const result = await sessionPayloadForUser(user);
-  return { userId: user.id, result };
+  const result = await sessionPayloadForUser(user, input.context);
+  return { userId: user.id, result: { ...result, isNewUser: true } };
 }
 
 /**
- * 账号 + 密码登录（只查 username，不走邮箱字段）。
+ * 账号或 kk 号 + 密码登录（不走邮箱字段）。
+ * kind=kk / username 时只认对应一种，避免两个入口混用。
  */
 export async function loginUserByUsername(input: {
   username: string;
   password: string;
+  kind?: "kk" | "username" | "any";
+  context?: SessionContext;
 }): Promise<{ userId: string; result: AuthResultPayload }> {
-  const checked = validateUsername(input.username);
-  if (!checked.ok) throw new Error(checked.error);
-
   const password = (input.password || "").trim();
   if (password.length < 6) {
     throw new Error("密码至少 6 位");
   }
+  const parsed = parsePasswordLoginId(input.username, input.kind || "any");
+  if (!parsed.ok) throw new Error(parsed.error);
 
-  const user = await prisma.user.findUnique({
-    where: { username: checked.username },
-  });
+  const user =
+    parsed.via === "kk"
+      ? await prisma.user.findUnique({ where: { kkNumber: parsed.kkNumber } })
+      : await prisma.user.findUnique({
+          where: { username: parsed.username },
+        });
+  const mismatch =
+    parsed.via === "kk" ? "kk号或密码错误" : "账号或密码错误";
   if (
     !user ||
     !user.passwordSet ||
     !(await verifyPassword(password, user.passwordHash))
   ) {
-    throw new Error("账号或密码错误");
+    throw new Error(mismatch);
   }
 
-  const result = await sessionPayloadForUser(user);
+  const result = await sessionPayloadForUser(user, input.context);
+  return { userId: user.id, result };
+}
+
+/** 已绑定手机号且设置过密码：手机号 + 密码登录（不发短信） */
+export async function loginUserByPhonePassword(input: {
+  phone: string;
+  password: string;
+  context?: SessionContext;
+}): Promise<{ userId: string; result: AuthResultPayload }> {
+  const phone = normalizePhone(input.phone);
+  if (!isValidCnMobile(phone)) {
+    throw new Error("请输入正确的手机号");
+  }
+  const password = (input.password || "").trim();
+  if (password.length < 6) {
+    throw new Error("密码至少 6 位");
+  }
+  const user = await prisma.user.findFirst({ where: { phone } });
+  if (!user) {
+    throw new Error("手机号或密码错误");
+  }
+  if (!user.passwordSet) {
+    throw new Error("该手机号尚未设置密码，请用验证码登录，或先在个人中心设置密码");
+  }
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    throw new Error("手机号或密码错误");
+  }
+  const result = await sessionPayloadForUser(user, input.context);
   return { userId: user.id, result };
 }

@@ -3,6 +3,7 @@ import { getSession } from "@andyyyds/shared/auth";
 import { isAdmin, roleLabels } from "@andyyyds/shared/roles";
 import { resolveStoredAccessUrl } from "@andyyyds/shared/storage";
 import { UserAvatar } from "@/components/user-avatar";
+import { WwwHomeLink } from "@/components/www-home-link";
 
 export async function SiteHeader() {
   const session = await getSession();
@@ -17,22 +18,42 @@ export async function SiteHeader() {
           账号中心
         </Link>
         <nav className="flex flex-wrap items-center gap-2 text-sm">
+          <WwwHomeLink />
           {session ? (
             <>
+              <Link
+                href="/account/security"
+                className="btn btn-secondary min-h-10 px-3"
+              >
+                安全中心
+              </Link>
               <Link
                 href="/account"
                 className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 hover:bg-[var(--brand)]/8"
               >
                 <UserAvatar name={session.name} src={avatarUrl} size="xs" />
                 <span>{session.name}</span>
+                {session.kkNumber ? (
+                  <span className="font-mono text-xs text-[var(--muted)]">
+                    {session.kkNumber}
+                  </span>
+                ) : null}
                 <span className="text-xs text-[var(--muted)]">
                   {roleLabels(session)}
                 </span>
               </Link>
               {isAdmin(session) ? (
-                <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
-                  用户管理
-                </Link>
+                <>
+                  <Link href="/studio/apps" className="btn btn-secondary min-h-10 px-3">
+                    软件产品
+                  </Link>
+                  <Link href="/studio/users" className="btn btn-secondary min-h-10 px-3">
+                    用户管理
+                  </Link>
+                  <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
+                    登录设置
+                  </Link>
+                </>
               ) : null}
               <form action="/api/auth/logout" method="post">
                 <button type="submit" className="btn btn-secondary min-h-10 px-3">
@@ -42,6 +63,9 @@ export async function SiteHeader() {
             </>
           ) : (
             <>
+              <Link href="/integrate" className="hidden min-h-10 items-center sm:inline-flex">
+                产品接入
+              </Link>
               <Link href="/login" className="btn btn-secondary min-h-10 px-3">
                 登录
               </Link>

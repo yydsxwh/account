@@ -11,6 +11,13 @@ function mapUser(u: {
   id: string;
   name: string;
   email: string;
+  username: string | null;
+  kkNumber: number | null;
+  phone: string;
+  realName: string;
+  idType: string;
+  idNumber: string;
+  realNameUpdatedAt: Date | null;
   role: string;
   roles: string;
   requestedRole: string;
@@ -39,6 +46,13 @@ function mapUser(u: {
     id: u.id,
     name: u.name,
     email: u.email,
+    username: u.username || "",
+    kkNumber: u.kkNumber,
+    phone: u.phone || "",
+    realName: u.realName || "",
+    idType: u.idType || "id_card",
+    idNumber: u.idNumber || "",
+    realNameUpdatedAt: u.realNameUpdatedAt?.toISOString() ?? null,
     role: u.role,
     roles,
     rolesLabel: roleLabels(roles),
@@ -78,6 +92,13 @@ export default async function StudioUsersPage() {
     id: true,
     name: true,
     email: true,
+    username: true,
+    kkNumber: true,
+    phone: true,
+    realName: true,
+    idType: true,
+    idNumber: true,
+    realNameUpdatedAt: true,
     role: true,
     roles: true,
     requestedRole: true,
@@ -126,12 +147,17 @@ export default async function StudioUsersPage() {
         <div>
           <h1 className="text-3xl font-semibold">用户管理</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            查看注册用户、邀请关系、审核角色申请；可为同一用户勾选多种身份。
+            查看注册用户、手机号、实名信息、邀请关系、审核角色申请；可为同一用户勾选多种身份。手机号和证件号仅后台可见，不打码。
           </p>
         </div>
-        <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
-          登录设置
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/studio/apps" className="btn btn-secondary min-h-10 px-3">
+            软件产品
+          </Link>
+          <Link href="/studio/settings" className="btn btn-secondary min-h-10 px-3">
+            登录设置
+          </Link>
+        </div>
       </div>
       <UserAdminPanel
         initialUsers={users.map(mapUser)}

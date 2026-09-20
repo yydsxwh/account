@@ -1,0 +1,32 @@
+name: Account center
+
+on:
+  push:
+    branches:
+      - main
+      - cursor/standalone-account-live-d249
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          AUTH_SECRET: ci-test-secret
+          DATABASE_URL: file:./ci.db
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      - run: npm run build
+        env:
+          AUTH_SECRET: ci-build-secret
+          DATABASE_URL: file:./ci.db
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000

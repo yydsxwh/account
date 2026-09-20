@@ -8,6 +8,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession, hashPassword, verifyPassword } from "@andyyyds/shared/auth";
 import { prisma } from "@andyyyds/shared/db";
+import { clientIpFromRequest } from "@andyyyds/shared/identity/rate-limit";
+import { recordSecurityEvent } from "@andyyyds/shared/security/events";
+import { revokeOtherUserSessions } from "@andyyyds/shared/security/sessions";
 
 const schema = z
   .object({
@@ -58,13 +61,29 @@ export async function POST(req: Request) {
       data: {
         passwordHash: await hashPassword(body.newPassword),
         passwordSet: true,
+        passwordUpdatedAt: new Date(),
       },
+    });
+
+    // 改密码等于"我怀疑账号被人用了"，顺手把别的设备踢下线
+    const revoked = await revokeOtherUserSessions({
+      userId: session.id,
+      keepSessionId: session.sessionId,
+    });
+    await recordSecurityEvent({
+      userId: session.id,
+      type: "password_changed",
+      detail: revoked > 0 ? `已退出其他设备 ${revoked} 个` : "",
+      ip: clientIpFromRequest(req),
     });
 
     return NextResponse.json({
       ok: true,
+      revokedSessions: revoked,
       message: user.passwordSet
-        ? "密码已修改"
+        ? revoked > 0
+          ? `密码已修改，并退出了其他 ${revoked} 台设备`
+          : "密码已修改"
         : "密码已设置。若尚未绑定真实邮箱，请在下方绑定后再用邮箱登录",
     });
   } catch (error) {

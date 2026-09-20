@@ -5,6 +5,7 @@
  * 任一方式注册后，在此补绑其余方式即可合并到同一账号（占用他人身份则拒绝）。
  */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { isPlaceholderEmail } from "@andyyyds/shared/auth-email";
 import { maskPhone, normalizePhone } from "@andyyyds/shared/phone";
@@ -91,6 +92,8 @@ export function AccountAuthPanel({
   }
 
   useEffect(() => {
+    // 只能在挂载后读浏览器 UA：在渲染期读会和服务端 HTML 对不上
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInWeChat(isWeChatBrowser());
     setInCapacitorAndroid(isCapacitorAndroid());
     fetch("/api/auth/methods")
@@ -114,7 +117,8 @@ export function AccountAuthPanel({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("wechat_oauth") === "ok" || params.get("wechat_login") === "ok") {
-      // 绑定回调后刷新状态；OA / 扫码均可能写入
+      // 绑定回调后刷新状态；OA / 扫码均可能写入。URL 参数同样只能挂载后读
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBoundWechatOa(true);
       setBoundWechatWeb(true);
       setNotice("微信绑定成功，可用微信登录同一账号");
@@ -196,8 +200,8 @@ export function AccountAuthPanel({
     setCooldown(Number(data.cooldownSec) || 60);
     setNotice(
       data.testMode
-        ? "测试模式：请查看服务器日志中的验证码，或使用固定测试码"
-        : "验证码已发送",
+        ? "当前是测试模式，短信不会发到手机。请站长在登录设置关掉测试模式，或先用固定测试码。"
+        : "验证码已发送到该手机，5 分钟内有效",
     );
   }
 
@@ -251,7 +255,7 @@ export function AccountAuthPanel({
     setCurrentPhone(normalizePhone(bindPhone));
     setShowBindPhone(false);
     setCode("");
-    setNotice("手机号绑定成功，可用验证码登录同一账号");
+    setNotice("手机号绑定成功，可用验证码或密码登录同一账号");
   }
 
   async function onBindEmail(e: React.FormEvent) {
@@ -347,18 +351,25 @@ export function AccountAuthPanel({
 
   return (
     <section className="surface rounded-[28px] p-5 sm:p-6">
-      <h2 className="text-lg font-semibold">账号安全</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        四种登录方式可绑定到同一账号：登录账号、邮箱、手机号、微信。用任意一种注册后，在此补绑其余方式即可互通。
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">账号安全</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            kk 号注册时已自动分配。还可绑定自设账号（类似微信号）、邮箱、手机号、微信，任意一种都能登录同一用户。
+          </p>
+        </div>
+        <Link href="/account/security" className="btn btn-secondary min-h-10 shrink-0 px-3 text-sm">
+          登录设备与安全记录
+        </Link>
+      </div>
 
       <div className="mt-4 space-y-3">
         {/* —— 登录账号 —— */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-xs text-[var(--muted)]">登录账号</div>
+            <div className="text-xs text-[var(--muted)]">自设账号（类似微信号）</div>
             <div className="mt-0.5 break-all text-sm font-medium">
-              {hasUsername ? currentUsername : "未绑定"}
+              {hasUsername ? currentUsername : "未设置"}
             </div>
           </div>
           <button
@@ -368,7 +379,7 @@ export function AccountAuthPanel({
               closeOtherForms(showBindUsername ? null : "username")
             }
           >
-            {showBindUsername ? "取消" : hasUsername ? "更换账号" : "绑定账号"}
+            {showBindUsername ? "取消" : hasUsername ? "更换账号" : "设置账号"}
           </button>
         </div>
 
@@ -378,7 +389,7 @@ export function AccountAuthPanel({
             className="space-y-3 rounded-2xl bg-[var(--bg-deep)]/40 p-4"
           >
             <p className="text-xs leading-5 text-[var(--muted)]">
-              4–20 位，小写字母开头，仅含字母、数字、下划线（与邮箱不是同一种登录方式）。
+              类似微信号：4–20 位，小写字母开头，字母和数字可混用（可含下划线）。这和系统自动发的 kk 号不是一回事。
             </p>
             <label className="block text-sm">
               <span className="mb-1.5 block text-[var(--muted)]">登录账号</span>
@@ -390,7 +401,7 @@ export function AccountAuthPanel({
                 value={bindUsername}
                 onChange={(e) => setBindUsername(e.target.value)}
                 required
-                placeholder="例如 xiaoming01"
+                placeholder="例如 yydsboss01"
               />
             </label>
             {hasUsername ? (

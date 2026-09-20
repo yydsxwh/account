@@ -100,6 +100,8 @@ export async function verifyWechatOAuthState(
 export function safeReturnUrl(raw: string | null | undefined, fallback = "/") {
   const value = (raw || "").trim();
   if (!value.startsWith("/") || value.startsWith("//")) return fallback;
-  if (value.includes("://")) return fallback;
-  return value.slice(0, 500) || fallback;
+  // 只检查路径本身，查询串里的 redirect_uri=https://... 是合法的产品回跳
+  const pathOnly = value.split("?")[0] || "";
+  if (pathOnly.includes("://")) return fallback;
+  return value.slice(0, 1500) || fallback;
 }

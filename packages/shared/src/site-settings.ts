@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "./db";
+import { isSmsLoginReady, resolveSmsRuntime } from "./sms-config";
 
 export type SiteSettingsRow = {
   id: string;
@@ -19,6 +20,9 @@ export type SiteSettingsRow = {
   smsAccessKeySecret: string;
   smsSignName: string;
   smsTemplateCode: string;
+  smsTemplateCodeLogin: string;
+  smsTemplateCodeRegister: string;
+  smsTemplateCodeBind: string;
   smsTestMode: boolean;
   smsTestFixedCode: string;
   updatedAt: Date;
@@ -62,6 +66,7 @@ export function isMaskedPlaceholder(value: string | undefined) {
 }
 
 export function publicSiteSettings(row: SiteSettingsRow) {
+  const sms = resolveSmsRuntime(row);
   return {
     siteUrl: row.siteUrl,
     wechatAppId: row.wechatAppId,
@@ -91,19 +96,19 @@ export function publicSiteSettings(row: SiteSettingsRow) {
     smsAccessKeySecret: row.smsAccessKeySecret
       ? maskSecret(row.smsAccessKeySecret)
       : "",
-    smsSignName: row.smsSignName || "",
-    smsTemplateCode: row.smsTemplateCode || "",
-    smsTestMode: row.smsTestMode !== false,
+    smsSignName: row.smsSignName || sms.signName || "",
+    smsTemplateCode: row.smsTemplateCode || sms.templateCode || "",
+    smsTemplateCodeLogin:
+      row.smsTemplateCodeLogin || sms.templateCodeLogin || "",
+    smsTemplateCodeRegister:
+      row.smsTemplateCodeRegister || sms.templateCodeRegister || "",
+    smsTemplateCodeBind:
+      row.smsTemplateCodeBind || sms.templateCodeBind || "",
+    smsTestMode: sms.testMode,
     smsTestFixedCode: row.smsTestFixedCode || "",
-    smsLoginReady: Boolean(
-      row.smsEnabled &&
-        (row.smsTestMode ||
-          row.smsProvider === "test" ||
-          (row.smsAccessKeyId &&
-            row.smsAccessKeySecret &&
-            row.smsSignName &&
-            row.smsTemplateCode)),
-    ),
+    smsAliyunReady: sms.aliyunReady,
+    smsEnvConfigured: sms.usingEnvKeys,
+    smsLoginReady: isSmsLoginReady(row),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
