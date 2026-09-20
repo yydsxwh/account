@@ -5,7 +5,7 @@ import {
   oneTimeClientSecret,
   secretEnvFilename,
   serializeStudioApp,
-} from "../src/lib/one-time-client-secret";
+} from "../src/helpers/one-time-client-secret";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);

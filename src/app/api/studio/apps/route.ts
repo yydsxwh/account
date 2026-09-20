@@ -13,7 +13,7 @@ import { CLIENT_TYPES, GRANT_TYPES } from "@andyyyds/shared/oidc/clients";
 import { KNOWN_SCOPES, formatScope, parseScope } from "@andyyyds/shared/oidc/scopes";
 import { recordSecurityEvent } from "@andyyyds/shared/security/events";
 import { requireAdmin, studioErrorResponse } from "@andyyyds/shared/studio";
-import { oneTimeClientSecret } from "@/lib/one-time-client-secret";
+import { oneTimeClientSecret } from "@/helpers/one-time-client-secret";
 
 function serializeApp(row: {
   id: string;

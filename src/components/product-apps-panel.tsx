@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { oneTimeClientSecret } from "@/lib/one-time-client-secret";
+import { oneTimeClientSecret } from "@/helpers/one-time-client-secret";
 import { OneTimeSecretPanel, type RevealedSecret } from "./one-time-secret-panel";
 
 export type ProductApp = {

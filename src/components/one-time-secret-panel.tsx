@@ -6,7 +6,7 @@ import {
   buildSecretEnvFile,
   copySecretText,
   secretEnvFilename,
-} from "@/lib/one-time-client-secret";
+} from "@/helpers/one-time-client-secret";
 
 export type RevealedSecret = {
   clientId: string;

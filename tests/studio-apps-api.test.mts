@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { oneTimeClientSecret } from "../src/lib/one-time-client-secret";
+import { oneTimeClientSecret } from "../src/helpers/one-time-client-secret";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
