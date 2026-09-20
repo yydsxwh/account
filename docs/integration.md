@@ -55,19 +55,21 @@ public 客户端不发密钥。
 
 ```
 client_id      rishi
-client_type    confidential          （日事有 Next.js 后端）
-redirect_uri   https://rishi.yydsxwh.com/api/auth/callback
-               http://localhost:3100/api/auth/callback     （本地开发）
+client_type    confidential          （日事 BFF 换票，浏览器和 APK 都不持有 secret）
+redirect_uri   https://www.yydsxwh.com/api/days/auth/callback
+               http://localhost:5173/api/days/auth/callback     （本地开发）
 scope          openid profile email offline_access
 ```
 
-日事仓库的 `.env`：
+空库 `npm run db:seed` 会写入 `rishi`。已有生产库用 `npx tsx scripts/upsert-rishi-client.ts`，不要重新 seed。
+
+日事仓库服务端的 `.env`：
 
 ```bash
 ACCOUNT_ISSUER="https://account.yydsxwh.com"
 ACCOUNT_CLIENT_ID="rishi"
 ACCOUNT_CLIENT_SECRET="…登记时显示的那一串，只放服务端…"
-ACCOUNT_REDIRECT_URI="https://rishi.yydsxwh.com/api/auth/callback"
+ACCOUNT_REDIRECT_URI="https://www.yydsxwh.com/api/days/auth/callback"
 # 日事自己的应用会话密钥，和 account 的 AUTH_SECRET 没有关系，不要复用
 RISHI_SESSION_SECRET="另外生成一串随机值"
 ```

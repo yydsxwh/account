@@ -121,6 +121,7 @@ async function main() {
 
   const docsSecret = process.env.DEMO_DOCS_CLIENT_SECRET || "demo-docs-secret";
   const shopSecret = process.env.DEMO_SHOP_CLIENT_SECRET || "demo-shop-secret";
+  const rishiSecret = process.env.DEMO_RISHI_CLIENT_SECRET || "demo-rishi-secret";
   await prisma.oAuthClient.create({
     data: {
       clientId: "docs",
@@ -147,12 +148,31 @@ async function main() {
       ]),
     },
   });
+  await prisma.oAuthClient.create({
+    data: {
+      clientId: "rishi",
+      clientSecret: await hashClientSecret(rishiSecret),
+      clientType: "confidential",
+      name: "颗秒日事",
+      homepageUrl: "https://www.yydsxwh.com/products/days/",
+      allowedScopes: "openid profile email offline_access",
+      requirePkce: true,
+      redirectUris: serializeUriList([
+        "https://www.yydsxwh.com/api/days/auth/callback",
+        "http://localhost:5173/api/days/auth/callback",
+        "http://127.0.0.1:5173/api/days/auth/callback",
+        "http://localhost:3120/api/days/auth/callback",
+        "http://127.0.0.1:3120/api/days/auth/callback",
+      ]),
+    },
+  });
 
   console.log("Seeded demo accounts. Password for all: 123456");
   console.log("  admin@yyds.local / teacher@yyds.local / agent@yyds.local");
   console.log("  student@yyds.local / merchant@yyds.local");
   console.log("  username demo_user / 123456  (kk号 100–105)");
   console.log("Demo products: docs / shop  (open /demo/docs and /demo/shop)");
+  console.log("Rishi OIDC client: rishi  (local secret demo-rishi-secret unless DEMO_RISHI_CLIENT_SECRET is set)");
 }
 
 main()
