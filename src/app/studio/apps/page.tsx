@@ -32,6 +32,7 @@ export default async function StudioAppsPage() {
         initialApps={rows.map((row) => ({
           id: row.id,
           clientId: row.clientId,
+          clientType: row.clientType,
           name: row.name,
           homepageUrl: row.homepageUrl,
           redirectUris: parseUriList(row.redirectUris),
