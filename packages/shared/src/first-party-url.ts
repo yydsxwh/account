@@ -8,8 +8,14 @@ const FIRST_PARTY_HOSTS = new Set([
   "yydsxwh.com",
 ]);
 
+function isLoopbackHost(host: string): boolean {
+  const value = host.toLowerCase();
+  return value === "localhost" || value === "127.0.0.1" || value === "[::1]";
+}
+
 export function isFirstPartyHost(host: string): boolean {
-  return FIRST_PARTY_HOSTS.has(host.toLowerCase());
+  const value = host.toLowerCase();
+  return FIRST_PARTY_HOSTS.has(value) || isLoopbackHost(value);
 }
 
 function isAbsoluteHttpUrl(value: string): boolean {
@@ -57,4 +63,23 @@ export function toAbsoluteSiteUrl(pathOrUrl: string, siteOrigin: string): string
   if (!safe) return siteOrigin;
   if (isAbsoluteHttpUrl(safe)) return safe;
   return `${siteOrigin.replace(/\/$/, "")}${safe}`;
+}
+
+/**
+ * 退出后的落地页：相对路径留在账号中心，绝对地址只允许第一方。
+ * 非法 next 一律回账号中心首页，避免开放重定向。
+ */
+export function resolveLogoutNext(
+  raw: string | null | undefined,
+  accountOrigin: string,
+): string {
+  const fallback = new URL("/", accountOrigin).toString();
+  const safe = safeNextTarget(raw);
+  if (!safe) return fallback;
+  if (isAbsoluteHttpUrl(safe)) return safe;
+  try {
+    return new URL(safe, accountOrigin).toString();
+  } catch {
+    return fallback;
+  }
 }
