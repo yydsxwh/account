@@ -31,12 +31,16 @@ export async function PATCH(req: Request) {
       select: { id: true, email: true, name: true, role: true },
     });
 
-    await createSession({
-      id: updated.id,
-      email: updated.email,
-      name: updated.name,
-      role: updated.role as typeof session.role,
-    });
+    // 只是刷新 Cookie 里的昵称，沿用当前会话，别在设备列表里多出一条
+    await createSession(
+      {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role as typeof session.role,
+      },
+      { reuseCurrent: true },
+    );
 
     return NextResponse.json({ ok: true, name: updated.name });
   } catch (error) {

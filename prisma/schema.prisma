@@ -7,18 +7,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// 账号：邮箱 / 登录名 / 手机 / 微信 四种方式可指向同一用户
+/// 账号：kk号 / 自设账号 / 邮箱 / 手机 / 微信 可指向同一用户
 model User {
   id           String  @id @default(cuid())
+  /// 全生态永久不变的公开用户 ID（usr_xxx），也是 OIDC 的 sub。
+  /// 其他产品只能存这个，不要存 email / username / 内部 id。
+  /// 可空是为了让旧库先 db push 再回填；读取时用 ensureUserPublicId 补齐。
+  publicId     String? @unique
   email        String  @unique
+  /// 邮箱验证通过的时间；null 表示未验证
+  emailVerifiedAt DateTime?
   passwordHash String
+  /// 是否已设置可用登录密码；手机/微信自动注册且未设密码时为 false
   passwordSet  Boolean @default(true)
+  passwordUpdatedAt DateTime?
   name         String
+  /// 系统自动分配的 kk 号（类似 QQ 号），从 3 位数起，越早越短
+  kkNumber     Int?    @unique
+  /// 可自设账号（类似微信号，英文+数字）；空/null 表示尚未设置
   username     String? @unique
   bio          String  @default("")
   avatarUrl    String  @default("")
+  /// Profile：展示用偏好，OIDC profile scope 会带出去
+  locale       String  @default("zh-Hans")
+  timezone     String  @default("Asia/Shanghai")
+  /// 手机号登录用；空表示未绑定。站长后台看全文，不打码。
   phone        String  @default("")
+  /// 实名：真实姓名，用户在个人中心补充后站长可见
+  realName     String  @default("")
+  /// id_card | passport | hk_mo_tw | other
+  idType       String  @default("id_card")
+  idNumber     String  @default("")
+  realNameUpdatedAt DateTime?
+  /// ADMIN 站长 | AGENT 加盟代理 | MERCHANT 入驻商家 | TEACHER 老师 | STUDENT 用户
   role         String  @default("STUDENT")
+  /// 多角色：逗号分隔；空则仅用 role
   roles        String  @default("")
   requestedRole         String @default("")
   roleApplicationStatus String @default("NONE")
@@ -34,10 +57,9 @@ model User {
   referredById String?
   referredBy   User?   @relation("Referrals", fields: [referredById], references: [id])
   referrals    User[]  @relation("Referrals")
+  productSyncStates ProductSyncState[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  productSyncStates ProductSyncState[]
 
   @@index([roleApplicationStatus])
   @@index([phone])
@@ -53,7 +75,8 @@ model ProductSyncState {
   id        String   @id @default(cuid())
   userId    String
   product   String
-  data      Json
+  /// JSON serialized AppData; SQLite in Prisma 5 does not support Json fields.
+  data      String
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -64,11 +87,18 @@ model ProductSyncState {
   @@index([userId, updatedAt])
 }
 
-/// 短信验证码（手机号登录 / 绑定）；哈希存储，短时有效
+/// kk 号发号器：next 为下一个将发出的数字
+model KkSequence {
+  id   String @id @default("default")
+  next Int    @default(100)
+}
+
+/// 短信验证码（手机号登录 / 注册 / 绑定）；哈希存储，短时有效
 model SmsCode {
   id        String    @id @default(cuid())
   phone     String
   codeHash  String
+  /// login | register | bind
   purpose   String    @default("login")
   expiresAt DateTime
   usedAt    DateTime?
@@ -81,20 +111,177 @@ model SmsCode {
 /// 站长系统设置（短信 / 微信授权），单例 id = default
 model SiteSettings {
   id String @id @default("default")
+
   siteUrl String @default("")
+
   wechatAppId           String @default("")
   wechatAppSecret       String @default("")
   wechatWebAppId        String @default("")
   wechatWebAppSecret    String @default("")
   wechatMobileAppId     String @default("")
   wechatMobileAppSecret String @default("")
-  smsEnabled         Boolean @default(true)
-  smsProvider        String  @default("test")
-  smsAccessKeyId     String  @default("")
-  smsAccessKeySecret String  @default("")
-  smsSignName        String  @default("")
-  smsTemplateCode    String  @default("")
-  smsTestMode        Boolean @default(true)
-  smsTestFixedCode   String  @default("123456")
+
+  smsEnabled              Boolean @default(true)
+  smsProvider             String  @default("test")
+  smsAccessKeyId          String  @default("")
+  smsAccessKeySecret      String  @default("")
+  smsSignName             String  @default("")
+  /// 兼容旧字段：没填分场景 CODE 时当兜底
+  smsTemplateCode         String  @default("")
+  smsTemplateCodeLogin    String  @default("")
+  smsTemplateCodeRegister String  @default("")
+  smsTemplateCodeBind     String  @default("")
+  smsTestMode             Boolean @default(true)
+  smsTestFixedCode        String  @default("123456")
+
   updatedAt DateTime @updatedAt
+}
+
+/// 接入账号中心的软件产品（OAuth 2.0 / OIDC Client）
+model OAuthClient {
+  id           String   @id @default(cuid())
+  /// 给产品配置的公开 ID，如 rishi / course / forum
+  clientId     String   @unique
+  /// bcrypt 后的密钥；明文只在创建时展示一次。public 客户端此字段无意义
+  clientSecret String
+  /// confidential（有后端，可保存密钥）| public（SPA / App，必须 PKCE，无密钥）
+  clientType   String   @default("confidential")
+  name         String
+  description  String   @default("")
+  /// 产品首页，个人中心「打开」用
+  homepageUrl  String   @default("")
+  /// JSON 字符串数组：登录成功后允许跳回的地址。必须精确匹配，不支持通配符
+  redirectUris String   @default("[]")
+  /// 空格分隔：该产品最多能申请到的 scope
+  allowedScopes String  @default("openid profile email")
+  /// 空格分隔：authorization_code refresh_token
+  grantTypes   String   @default("authorization_code refresh_token")
+  /// 强制 PKCE。public 客户端无条件强制，与此字段无关。
+  /// 默认 false 是为了不打断 PKCE 之前就已经接入的产品；
+  /// 新产品由站长后台创建时会显式写 true。
+  requirePkce  Boolean  @default(false)
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// 一次性授权码。列名仍是 code，但存的是 SHA-256 摘要，不是明文
+model OAuthCode {
+  id          String    @id @default(cuid())
+  codeHash    String    @unique @map("code")
+  clientId    String
+  userId      String
+  redirectUri String
+  /// 空格分隔的已批准 scope
+  scope       String    @default("")
+  nonce       String    @default("")
+  codeChallenge       String @default("")
+  /// S256（plain 不接受）
+  codeChallengeMethod String @default("")
+  /// 签发这枚 code 的账号中心会话，便于产品退出时联动
+  sessionId   String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([expiresAt])
+}
+
+/// 产品持有的访问令牌。列名仍是 token，但存的是 SHA-256 摘要
+model OAuthAccessToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token")
+  clientId  String
+  userId    String
+  scope     String   @default("")
+  sessionId String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// 刷新令牌：一次性使用 + 轮换。摘要存储
+model OAuthRefreshToken {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  clientId    String
+  userId      String
+  scope       String    @default("")
+  sessionId   String?
+  /// 轮换后指向新令牌；旧令牌被重复使用时说明可能泄露，整条链作废
+  replacedById String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
+/// OIDC 签名密钥。优先用 OIDC_PRIVATE_KEY 环境变量；没有时在这里生成并持久化
+model SigningKey {
+  id            String   @id @default(cuid())
+  kid           String   @unique
+  alg           String   @default("RS256")
+  privateKeyPem String
+  publicJwk     String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  retiredAt     DateTime?
+}
+
+/// 账号中心自己的登录会话：可列设备、可撤销
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String
+  /// 会话令牌的 SHA-256 摘要；明文只在 Cookie 里
+  tokenHash  String   @unique
+  userAgent  String   @default("")
+  ip         String   @default("")
+  /// password | sms | wechat | sso
+  method     String   @default("password")
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+/// 登录尝试记录（成功与失败都记）。不记密码、不记令牌
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  /// password | sms | wechat | oauth
+  method    String   @default("password")
+  success   Boolean  @default(false)
+  /// 失败原因的短码，例如 bad_password / no_such_user
+  reason    String   @default("")
+  ip        String   @default("")
+  userAgent String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// 安全事件：改密码、撤销会话、绑定方式变化、授权产品
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  /// password_changed | session_revoked | sessions_revoked_all | email_changed
+  /// | phone_bound | client_authorized | client_secret_rotated
+  type      String
+  detail    String   @default("")
+  ip        String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
 }

@@ -1,6 +1,6 @@
 /**
  * POST /api/auth/sms/send
- * body: { phone, purpose?: "login" | "bind" }
+ * body: { phone, purpose?: "login" | "register" | "bind" }
  * 发送短信验证码；测试模式下码写入服务端日志。
  */
 
@@ -11,7 +11,7 @@ import { sendSmsCode } from "@andyyyds/shared/sms";
 
 const schema = z.object({
   phone: z.string().min(6).max(20),
-  purpose: z.enum(["login", "bind"]).optional().default("login"),
+  purpose: z.enum(["login", "register", "bind"]).optional().default("login"),
 });
 
 export async function POST(req: Request) {

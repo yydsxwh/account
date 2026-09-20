@@ -7,6 +7,7 @@ import {
   pickSecretUpdate,
   publicSiteSettings,
 } from "@andyyyds/shared/site-settings";
+import { resolveSmsRuntime } from "@andyyyds/shared/sms-config";
 import { requireAdmin, studioErrorResponse } from "@andyyyds/shared/studio";
 
 export async function GET() {
@@ -34,6 +35,9 @@ const schema = z.object({
   smsAccessKeySecret: z.string().max(200).optional(),
   smsSignName: z.string().max(40).optional(),
   smsTemplateCode: z.string().max(40).optional(),
+  smsTemplateCodeLogin: z.string().max(40).optional(),
+  smsTemplateCodeRegister: z.string().max(40).optional(),
+  smsTemplateCodeBind: z.string().max(40).optional(),
   smsTestMode: z.boolean().optional(),
   smsTestFixedCode: z.string().max(8).optional(),
 });
@@ -43,6 +47,58 @@ export async function PATCH(req: Request) {
     await requireAdmin();
     const body = schema.parse(await req.json());
     const current = await getSiteSettings();
+    const savingSms =
+      body.smsEnabled !== undefined ||
+      body.smsTestMode !== undefined ||
+      body.smsAccessKeyId !== undefined ||
+      body.smsAccessKeySecret !== undefined ||
+      body.smsSignName !== undefined ||
+      body.smsTemplateCode !== undefined ||
+      body.smsTemplateCodeLogin !== undefined ||
+      body.smsTemplateCodeRegister !== undefined ||
+      body.smsTemplateCodeBind !== undefined ||
+      body.smsTestFixedCode !== undefined;
+    const nextTestMode = body.smsTestMode ?? current.smsTestMode;
+    const nextTemplateLogin =
+      body.smsTemplateCodeLogin?.trim() ?? current.smsTemplateCodeLogin;
+    const nextTemplateRegister =
+      body.smsTemplateCodeRegister?.trim() ?? current.smsTemplateCodeRegister;
+    const nextTemplateBind =
+      body.smsTemplateCodeBind?.trim() ?? current.smsTemplateCodeBind;
+    const nextTemplateFallback =
+      body.smsTemplateCode?.trim() ??
+      nextTemplateLogin ??
+      current.smsTemplateCode;
+    const nextKeys = {
+      smsEnabled: body.smsEnabled ?? current.smsEnabled,
+      smsTestMode: nextTestMode,
+      smsAccessKeyId: body.smsAccessKeyId?.trim() ?? current.smsAccessKeyId,
+      smsAccessKeySecret:
+        pickSecretUpdate(body.smsAccessKeySecret, current.smsAccessKeySecret) ??
+        current.smsAccessKeySecret,
+      smsSignName: body.smsSignName?.trim() ?? current.smsSignName,
+      smsTemplateCode: nextTemplateFallback,
+      smsTemplateCodeLogin: nextTemplateLogin,
+      smsTemplateCodeRegister: nextTemplateRegister,
+      smsTemplateCodeBind: nextTemplateBind,
+      smsTestFixedCode:
+        body.smsTestFixedCode?.trim() ?? current.smsTestFixedCode,
+    };
+    const runtime = resolveSmsRuntime(nextKeys);
+    if (
+      savingSms &&
+      runtime.enabled &&
+      !runtime.testMode &&
+      !runtime.aliyunReady
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "要发到用户手机，请先填齐阿里云 AccessKey、短信签名和模板 CODE，或在 .env 配置 SMS_ACCESS_KEY_ID 等",
+        },
+        { status: 400 },
+      );
+    }
     const updated = await prisma.siteSettings.update({
       where: { id: "default" },
       data: {
@@ -62,17 +118,17 @@ export async function PATCH(req: Request) {
             body.wechatMobileAppSecret,
             current.wechatMobileAppSecret,
           ) ?? current.wechatMobileAppSecret,
-        smsEnabled: body.smsEnabled ?? current.smsEnabled,
-        smsProvider: body.smsProvider ?? current.smsProvider,
-        smsAccessKeyId: body.smsAccessKeyId?.trim() ?? current.smsAccessKeyId,
-        smsAccessKeySecret:
-          pickSecretUpdate(body.smsAccessKeySecret, current.smsAccessKeySecret) ??
-          current.smsAccessKeySecret,
-        smsSignName: body.smsSignName?.trim() ?? current.smsSignName,
-        smsTemplateCode: body.smsTemplateCode?.trim() ?? current.smsTemplateCode,
-        smsTestMode: body.smsTestMode ?? current.smsTestMode,
-        smsTestFixedCode:
-          body.smsTestFixedCode?.trim() ?? current.smsTestFixedCode,
+        smsEnabled: nextKeys.smsEnabled,
+        smsProvider: nextTestMode ? "test" : "aliyun",
+        smsAccessKeyId: nextKeys.smsAccessKeyId,
+        smsAccessKeySecret: nextKeys.smsAccessKeySecret,
+        smsSignName: nextKeys.smsSignName,
+        smsTemplateCode: nextKeys.smsTemplateCode,
+        smsTemplateCodeLogin: nextKeys.smsTemplateCodeLogin,
+        smsTemplateCodeRegister: nextKeys.smsTemplateCodeRegister,
+        smsTemplateCodeBind: nextKeys.smsTemplateCodeBind,
+        smsTestMode: nextTestMode,
+        smsTestFixedCode: nextKeys.smsTestFixedCode,
       },
     });
     invalidateSiteSettingsCache();

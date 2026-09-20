@@ -29,6 +29,7 @@ export async function GET() {
         id: session.id,
         name: session.name,
         avatarUrl,
+        kkNumber: session.kkNumber,
       },
     },
     { headers: { "Cache-Control": "no-store" } },

@@ -77,8 +77,8 @@ export async function POST(req: Request) {
       username: bound.username,
       passwordSet: bound.passwordSet,
       message: hadUsername
-        ? "登录账号已更换"
-        : "登录账号已绑定，可用账号 + 密码、邮箱、手机号或微信登录同一账号",
+        ? "自设账号已更换"
+        : "自设账号已设置，可用「账号」页签 + 密码登录；kk 号请用「kk号」页签",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

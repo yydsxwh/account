@@ -23,8 +23,15 @@ const RPCClient = require("@alicloud/pop-core") as {
 };
 import { hashPassword, verifyPassword } from "./password";
 import { prisma } from "./db";
+import {
+  resolveSmsRuntime,
+  templateCodeFor,
+  type SmsPurpose,
+} from "./sms-config";
 import { getSiteSettings, type SiteSettingsRow } from "./site-settings";
 import { isValidCnMobile, normalizePhone } from "./phone";
+
+export type { SmsPurpose };
 
 /** 验证码有效期（分钟） */
 export const SMS_CODE_TTL_MINUTES = 5;
@@ -33,17 +40,11 @@ export const SMS_RESEND_COOLDOWN_SEC = 60;
 /** 同一手机号每日最多发送次数 */
 export const SMS_DAILY_LIMIT = 20;
 
-export type SmsPurpose = "login" | "bind";
 
 export function smsConfigured(settings: SiteSettingsRow) {
-  if (!settings.smsEnabled) return false;
-  if (settings.smsTestMode || settings.smsProvider === "test") return true;
-  return Boolean(
-    settings.smsAccessKeyId?.trim() &&
-      settings.smsAccessKeySecret?.trim() &&
-      settings.smsSignName?.trim() &&
-      settings.smsTemplateCode?.trim(),
-  );
+  const runtime = resolveSmsRuntime(settings);
+  if (!runtime.enabled) return false;
+  return runtime.testMode || runtime.aliyunReady;
 }
 
 function randomSixDigitCode() {
@@ -51,13 +52,16 @@ function randomSixDigitCode() {
 }
 
 async function sendAliyunSms(input: {
-  settings: SiteSettingsRow;
+  accessKeyId: string;
+  accessKeySecret: string;
+  signName: string;
+  templateCode: string;
   phone: string;
   code: string;
 }) {
   const client = new RPCClient({
-    accessKeyId: input.settings.smsAccessKeyId.trim(),
-    accessKeySecret: input.settings.smsAccessKeySecret.trim(),
+    accessKeyId: input.accessKeyId,
+    accessKeySecret: input.accessKeySecret,
     endpoint: "https://dysmsapi.aliyuncs.com",
     apiVersion: "2017-05-25",
   });
@@ -65,8 +69,8 @@ async function sendAliyunSms(input: {
     "SendSms",
     {
       PhoneNumbers: input.phone,
-      SignName: input.settings.smsSignName.trim(),
-      TemplateCode: input.settings.smsTemplateCode.trim(),
+      SignName: input.signName,
+      TemplateCode: input.templateCode,
       TemplateParam: JSON.stringify({ code: input.code }),
     },
     { method: "POST" },
@@ -90,8 +94,14 @@ export async function sendSmsCode(input: {
   }
   const purpose: SmsPurpose = input.purpose || "login";
   const settings = await getSiteSettings();
-  if (!settings.smsEnabled) {
+  const runtime = resolveSmsRuntime(settings);
+  if (!runtime.enabled) {
     throw new Error("站长尚未启用短信登录，请使用邮箱或微信登录");
+  }
+  if (!runtime.testMode && !runtime.aliyunReady) {
+    throw new Error(
+      "尚未配置阿里云短信。请在系统设置填写 AccessKey、签名和模板，或先开启测试模式",
+    );
   }
   if (!smsConfigured(settings)) {
     throw new Error(
@@ -121,15 +131,37 @@ export async function sendSmsCode(input: {
     throw new Error("今日发送次数已达上限，请明天再试或改用其他登录方式");
   }
 
-  const useTest =
-    settings.smsTestMode || settings.smsProvider === "test";
+  const useTest = runtime.testMode;
   const code =
-    useTest && settings.smsTestFixedCode.trim()
-      ? settings.smsTestFixedCode.trim().slice(0, 8)
+    useTest && runtime.testFixedCode
+      ? runtime.testFixedCode.slice(0, 8)
       : randomSixDigitCode();
 
   if (!/^\d{4,8}$/.test(code)) {
     throw new Error("测试验证码格式无效，请使用 4～8 位数字");
+  }
+
+  if (!useTest) {
+    const templateCode = templateCodeFor(settings, purpose);
+    try {
+      await sendAliyunSms({
+        accessKeyId: runtime.accessKeyId,
+        accessKeySecret: runtime.accessKeySecret,
+        signName: runtime.signName,
+        templateCode,
+        phone,
+        code,
+      });
+      console.info(
+        `[sms:aliyun] phone=${phone} purpose=${purpose} template=${templateCode}`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "短信发送失败";
+      console.error(
+        `[sms:aliyun] fail phone=${phone} purpose=${purpose} template=${templateCode} error=${message}`,
+      );
+      throw new Error(message);
+    }
   }
 
   await prisma.smsCode.create({
@@ -146,8 +178,6 @@ export async function sendSmsCode(input: {
     console.info(
       `[sms:test] phone=${phone} purpose=${purpose} code=${code} ttl=${SMS_CODE_TTL_MINUTES}m`,
     );
-  } else {
-    await sendAliyunSms({ settings, phone, code });
   }
 
   return {

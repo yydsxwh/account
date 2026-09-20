@@ -33,10 +33,19 @@ yarn-error.log*
 # env files
 .env*
 !.env.example
+!.env.production.example
 
-# prisma
+# prisma / sqlite
 /prisma/*.db
 /prisma/*.db-journal
+*.db
+*.db-journal
+/data
+
+# OIDC 签名私钥：只放服务器和环境变量，永远不要提交
+*.pem
+*.key
+oidc*.pem
 
 # typescript
 *.tsbuildinfo
@@ -49,3 +58,7 @@ next-env.d.ts
 # uploaded media
 /public/uploads
 /uploads
+
+# python bytecode
+__pycache__/
+*.pyc

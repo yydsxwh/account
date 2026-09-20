@@ -38,10 +38,19 @@ export async function GET(request: Request) {
   const state = await prisma.productSyncState.findUnique({
     where: { userId_product: { userId: session.id, product: PRODUCT } },
   });
+  let data: unknown = null;
+  if (state?.data) {
+    try {
+      data = JSON.parse(state.data);
+    } catch {
+      return response(request, { error: "CORRUPT_SYNC_STATE" }, 500);
+    }
+  }
+
   return response(request, {
     authenticated: true,
     user: { id: session.id, name: session.name, email: session.email, avatarUrl: session.avatarUrl },
-    data: state?.data ?? null,
+    data,
     version: state?.version ?? 0,
     updatedAt: state?.updatedAt?.toISOString() ?? null,
   });
@@ -64,6 +73,11 @@ export async function POST(request: Request) {
     return response(request, { error: "INVALID_DATA" }, 400);
   }
 
+  const serialized = JSON.stringify(body.data);
+  if (Buffer.byteLength(serialized, "utf8") > MAX_BYTES) {
+    return response(request, { error: "PAYLOAD_TOO_LARGE" }, 413);
+  }
+
   const current = await prisma.productSyncState.findUnique({
     where: { userId_product: { userId: session.id, product: PRODUCT } },
     select: { version: true },
@@ -74,8 +88,8 @@ export async function POST(request: Request) {
 
   const state = await prisma.productSyncState.upsert({
     where: { userId_product: { userId: session.id, product: PRODUCT } },
-    create: { userId: session.id, product: PRODUCT, data: body.data, version: 1 },
-    update: { data: body.data, version: { increment: 1 } },
+    create: { userId: session.id, product: PRODUCT, data: serialized, version: 1 },
+    update: { data: serialized, version: { increment: 1 } },
   });
 
   return response(request, {
