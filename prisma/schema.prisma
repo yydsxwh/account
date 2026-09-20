@@ -75,7 +75,8 @@ model ProductSyncState {
   id        String   @id @default(cuid())
   userId    String
   product   String
-  data      Json
+  /// JSON serialized AppData; SQLite in Prisma 5 does not support Json fields.
+  data      String
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
