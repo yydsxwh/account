@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { oneTimeClientSecret } from "@/helpers/one-time-client-secret";
+import { OneTimeSecretPanel, type RevealedSecret } from "./one-time-secret-panel";
 
 export type ProductApp = {
   id: string;
   clientId: string;
+  clientType?: string;
   name: string;
   homepageUrl: string;
   redirectUris: string[];
@@ -46,7 +49,8 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [newSecret, setNewSecret] = useState("");
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<RevealedSecret | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
@@ -55,12 +59,22 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  function revealSecret(app: ProductApp | undefined, secret: string | undefined) {
+    const plaintext = oneTimeClientSecret(app?.clientType, secret);
+    if (!plaintext || !app?.clientId) {
+      setRevealed(null);
+      return;
+    }
+    setRevealed({ clientId: app.clientId, clientSecret: plaintext });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function createApp(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     setNotice("");
-    setNewSecret("");
+    setRevealed(null);
     try {
       const res = await fetch("/api/studio/apps", {
         method: "POST",
@@ -86,7 +100,7 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
         return;
       }
       if (data.app) setApps((prev) => [...prev, data.app!]);
-      setNewSecret(data.clientSecret || "");
+      revealSecret(data.app, data.clientSecret);
       setNotice(data.message || "已创建");
       setName("");
       setHomepageUrl("");
@@ -187,12 +201,53 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
     }
   }
 
+  async function rotateSecret(app: ProductApp) {
+    if (!window.confirm(`重新生成 ${app.clientId} 的 Client Secret？旧密钥会立即失效。`)) {
+      return;
+    }
+    setRotatingId(app.id);
+    setError("");
+    setNotice("");
+    setRevealed(null);
+    try {
+      const res = await fetch("/api/studio/apps", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: app.id, rotateSecret: true }),
+      });
+      const data = (await res.json()) as {
+        app?: ProductApp;
+        clientSecret?: string;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(data.error || "轮换密钥失败");
+        return;
+      }
+      if (data.app) {
+        setApps((prev) =>
+          prev.map((item) => (item.id === app.id ? { ...item, ...data.app! } : item)),
+        );
+      }
+      revealSecret(data.app || app, data.clientSecret);
+      setNotice(data.message || "新密钥已生成，请立刻复制或下载保存");
+    } catch {
+      setError("轮换密钥失败");
+    } finally {
+      setRotatingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {revealed ? (
+        <OneTimeSecretPanel revealed={revealed} onDismiss={() => setRevealed(null)} />
+      ) : null}
       <form onSubmit={createApp} className="surface space-y-3 rounded-[28px] p-5">
         <h2 className="text-lg font-semibold">接入新产品</h2>
         <p className="text-sm text-[var(--muted)]">
-          登记后，该软件登录时跳到账号中心，用户用同一套账号密码进入。
+          登记后，该软件登录时跳到账号中心，用户用同一套账号密码进入。创建 confidential 产品后会立即显示一次性 Client ID / Client Secret，可复制或下载保存。
         </p>
         <label className="block text-sm">
           产品名称
@@ -234,11 +289,6 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
         </label>
         {error ? <p className="text-sm text-[var(--fire)]">{error}</p> : null}
         {notice ? <p className="text-sm text-[var(--brand)]">{notice}</p> : null}
-        {newSecret ? (
-          <p className="break-all rounded-2xl bg-[var(--brand-soft)] p-3 text-sm">
-            client_secret：<code>{newSecret}</code>
-          </p>
-        ) : null}
         <button type="submit" className="btn btn-primary min-h-11 px-4" disabled={saving}>
           {saving ? "创建中…" : "登记产品"}
         </button>
@@ -343,10 +393,25 @@ export function ProductAppsPanel({ initialApps }: { initialApps: ProductApp[] })
                           type="button"
                           className="btn btn-secondary min-h-10 px-3"
                           onClick={() => startEdit(app)}
-                          disabled={togglingId === app.id}
+                          disabled={togglingId === app.id || rotatingId === app.id}
                         >
                           修改
                         </button>
+                        {app.clientType === "public" ? null : (
+                          <button
+                            type="button"
+                            className="btn btn-secondary min-h-10 px-3"
+                            onClick={() => void rotateSecret(app)}
+                            disabled={
+                              rotatingId === app.id ||
+                              togglingId === app.id ||
+                              editingId !== null
+                            }
+                            title="生成新的 Client Secret；旧密钥立即失效"
+                          >
+                            {rotatingId === app.id ? "生成中…" : "轮换密钥"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn btn-secondary min-h-10 px-3"
