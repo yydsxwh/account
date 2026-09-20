@@ -1,6 +1,7 @@
 import {
   WWW_HOME_URL,
   keepNextHref,
+  resolveLogoutNext,
   safeNextTarget,
   wechatReturnPath,
 } from "./first-party-url";
@@ -30,4 +31,30 @@ assert(
 );
 assert(wechatReturnPath("/studio") === "/studio", "wechat path");
 assert(WWW_HOME_URL === "https://www.yydsxwh.com", "www home");
+assert(
+  safeNextTarget("https://yydsxwh.com/forum") === "https://yydsxwh.com/forum",
+  "apex next",
+);
+assert(
+  safeNextTarget("http://localhost:3000/orders") ===
+    "http://localhost:3000/orders",
+  "localhost next",
+);
+assert(
+  resolveLogoutNext("https://evil.com/", "https://account.yydsxwh.com") ===
+    "https://account.yydsxwh.com/",
+  "logout reject third party",
+);
+assert(
+  resolveLogoutNext(
+    "https://yydsxwh.com/meetup",
+    "https://account.yydsxwh.com",
+  ) === "https://yydsxwh.com/meetup",
+  "logout back to apex",
+);
+assert(
+  resolveLogoutNext("/security", "https://account.yydsxwh.com") ===
+    "https://account.yydsxwh.com/security",
+  "logout relative stays on account",
+);
 console.log("first-party-url ok");
