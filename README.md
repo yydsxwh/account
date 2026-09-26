@@ -7,7 +7,11 @@
 - 其他软件（主站、日事、course、forum…）通过标准 OpenID Connect 跳过来登录，
   不要各自存密码，也**不要直接连这里的数据库**
 
-线上地址：`https://account.yydsxwh.com`（和 www.yydsxwh.com 分开部署）
+线上地址：`https://account.yydsxwh.com`（和 www.yydsxwh.com 分开部署，端口 3003，systemd `account.yydsxwh.com.service`）
+
+账号中心启动和提供登录不读取主站。`deploy/sync-users-both-ways.mjs` 是运维用的用户表对拷，不是请求路径。已登录产品用自己的会话；日事用账号中心 JWKS 在登录时验 ID Token，之后用 `rishi_session`，不会每个请求都来问这里。
+
+探活：`GET /api/health`。
 
 架构说明见 [`docs/architecture.md`](docs/architecture.md)；
 新产品怎么接见 [`docs/integration.md`](docs/integration.md)。
