@@ -1,11 +1,7 @@
 name: Account center
 
 on:
-  push:
-    branches:
-      - main
-      - cursor/standalone-account-live-d249
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
